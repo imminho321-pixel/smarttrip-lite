@@ -7,7 +7,7 @@ export default function SmartTripAnalyzer() {
   const [trip2Data, setTrip2Data] = useState('');
   const [scheduleData, setScheduleData] = useState('');
   const [targetDate, setTargetDate] = useState('');
-  const [result, setResult] = useState(null);
+  const [result, setResult] = useState<any>(null);
 
   // 날짜 추출 함수
   const extractDate = (text: string) => {
