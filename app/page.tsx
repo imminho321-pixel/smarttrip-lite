@@ -41,6 +41,7 @@ export default function SmartTripAnalyzer() {
   const parseVolumeData = (text: string) => {
     const lines = text.trim().split('\n');
     const volumes: Record<string, number> = {};
+    volumes[route] = volume;
     
     lines.forEach(line => {
       const parts = line.split('|').map(s => s.trim());
