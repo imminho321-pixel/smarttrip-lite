@@ -40,7 +40,7 @@ export default function SmartTripAnalyzer() {
   // 물량 데이터 파싱 함수
   const parseVolumeData = (text: string) => {
     const lines = text.trim().split('\n');
-    const volumes = {};
+    const volumes: { [key: string]: number } = {};
     
     lines.forEach(line => {
       const parts = line.split('|').map(s => s.trim());
@@ -57,7 +57,7 @@ export default function SmartTripAnalyzer() {
   // 스케줄 데이터 파싱 함수
   const parseScheduleData = (text: string) => {
     const lines = text.trim().split('\n');
-    const schedule = {};
+    const schedule: { [key: string]: string[] } = {};
     
     lines.forEach(line => {
       const parts = line.split('/').map(s => s.trim());
@@ -228,7 +228,7 @@ export default function SmartTripAnalyzer() {
     const schedule = parseScheduleData(scheduleData);
 
     // 각 담당자별 물량 계산
-    const workerVolumes = {};
+    const workerVolumes: any = {};
     
     Object.entries(schedule).forEach(([worker, routes]) => {
       let trip1Total = 0;
