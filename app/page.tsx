@@ -76,7 +76,7 @@ export default function SmartTripAnalyzer() {
   };
 
   // 라우트를 개별 하위 라우트로 확장하는 함수
-  const expandRoutes = (route, trip1Volumes, trip2Volumes) => {
+  const expandRoutes = (route: string, trip1Volumes: any, trip2Volumes: any) => {
     // 정확히 일치하는 라우트가 있으면 그대로 반환
     if (trip1Volumes[route] || trip2Volumes[route]) {
       return [route];
