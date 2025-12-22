@@ -10,7 +10,7 @@ export default function SmartTripAnalyzer() {
   const [result, setResult] = useState(null);
 
   // 날짜 추출 함수
-  const extractDate = (text) => {
+  const extractDate = (text: string) => {
     // "25.12.21" 또는 "2025.12.21" 형식 찾기
     const dotMatch = text.match(/(\d{2,4})\.(\d{1,2})\.(\d{1,2})/);
     if (dotMatch) {
