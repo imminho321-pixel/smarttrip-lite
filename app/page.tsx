@@ -10,7 +10,7 @@ export default function SmartTripAnalyzer() {
   const [result, setResult] = useState(null);
 
   // 날짜 추출 함수
-  const extractDate = (text: string) => {
+  const extractDate = (text) => {
     // "25.12.21" 또는 "2025.12.21" 형식 찾기
     const dotMatch = text.match(/(\d{2,4})\.(\d{1,2})\.(\d{1,2})/);
     if (dotMatch) {
@@ -38,10 +38,9 @@ export default function SmartTripAnalyzer() {
   };
 
   // 물량 데이터 파싱 함수
-  const parseVolumeData = (text: string) => {
+  const parseVolumeData = (text) => {
     const lines = text.trim().split('\n');
-    const volumes: Record<string, number> = {};
-    volumes[route] = volume;
+    const volumes = {};
     
     lines.forEach(line => {
       const parts = line.split('|').map(s => s.trim());
@@ -136,7 +135,7 @@ export default function SmartTripAnalyzer() {
       
       // Trip2가 있으면 Trip2 물량만, 없으면 Trip1 물량 표시
       const displayVolume = hasTrip2 ? data.trip2 : data.trip1;
-      const ratioText = hasTrip2 ? " (비율: " + trip2Ratio + "%)" : "";
+      const ratioText = hasTrip2 ? " (Trip2 비율: " + trip2Ratio + "%)" : "";
       
       text += emoji + " " + worker + " (합계: " + displayVolume + ")" + ratioText + "\n";
       
