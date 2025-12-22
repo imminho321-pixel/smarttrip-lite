@@ -128,7 +128,7 @@ export default function SmartTripAnalyzer() {
       const emoji = index === 0 ? '👑' : index === 1 ? '🥈' : index === 2 ? '🥉' : '👤';
       const trip2Ratio = hasTrip2 && data.total > 0 ? ((data.trip2 / data.total) * 100).toFixed(2) : '0.00';
       const displayVolume = hasTrip2 ? data.trip2 : data.trip1;
-      const ratioText = hasTrip2 ? " (Trip2 비율: " + trip2Ratio + "%)" : "";
+      const ratioText = hasTrip2 ? " (비율: " + trip2Ratio + "%)" : "";
       
       text += emoji + " " + worker + " (합계: " + displayVolume + ")" + ratioText + "\n";
       
