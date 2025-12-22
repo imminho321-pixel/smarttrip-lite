@@ -127,7 +127,7 @@ export default function SmartTripAnalyzer() {
       text += "📦 총 수량: " + displayTotal.toLocaleString() + "\n\n";
     }
 
-    result.workers.forEach(([worker, data], index) => {
+    result.workers.forEach(([worker, data]: any, index: any) => {
       const emoji = index === 0 ? '👑' : index === 1 ? '🥈' : index === 2 ? '🥉' : '👤';
       
       // 비율 계산: Trip2 / (Trip1 + Trip2) * 100 (Trip2가 있을 때만)
