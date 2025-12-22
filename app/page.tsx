@@ -40,7 +40,7 @@ export default function SmartTripAnalyzer() {
   // 물량 데이터 파싱 함수
   const parseVolumeData = (text: string) => {
     const lines = text.trim().split('\n');
-    const volumes = {};
+    const volumes: Record<string, number> = {};
     
     lines.forEach(line => {
       const parts = line.split('|').map(s => s.trim());
