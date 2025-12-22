@@ -7,18 +7,16 @@ export default function SmartTripAnalyzer() {
   const [trip2Data, setTrip2Data] = useState('');
   const [scheduleData, setScheduleData] = useState('');
   const [targetDate, setTargetDate] = useState('');
-  const [result, setResult] = useState<any>(null);
+  const [result, setResult] = useState(null);
 
   // 날짜 추출 함수
-  const extractDate = (text: string) => {
-    // "25.12.21" 또는 "2025.12.21" 형식 찾기
+  const extractDate = (text) => {
     const dotMatch = text.match(/(\d{2,4})\.(\d{1,2})\.(\d{1,2})/);
     if (dotMatch) {
       let year = dotMatch[1];
       const month = dotMatch[2].padStart(2, '0');
       const day = dotMatch[3].padStart(2, '0');
       
-      // 2자리 연도를 4자리로 변환
       if (year.length === 2) {
         year = '20' + year;
       }
@@ -26,7 +24,6 @@ export default function SmartTripAnalyzer() {
       return year + '-' + month + '-' + day;
     }
     
-    // "12월 21일" 형식 찾기
     const koreanMatch = text.match(/(\d{1,2})월\s*(\d{1,2})일/);
     if (koreanMatch) {
       const month = koreanMatch[1].padStart(2, '0');
@@ -38,9 +35,9 @@ export default function SmartTripAnalyzer() {
   };
 
   // 물량 데이터 파싱 함수
-  const parseVolumeData = (text: string) => {
+  const parseVolumeData = (text) => {
     const lines = text.trim().split('\n');
-    const volumes: { [key: string]: number } = {};
+    const volumes = {};
     
     lines.forEach(line => {
       const parts = line.split('|').map(s => s.trim());
@@ -55,9 +52,9 @@ export default function SmartTripAnalyzer() {
   };
 
   // 스케줄 데이터 파싱 함수
-  const parseScheduleData = (text: string) => {
+  const parseScheduleData = (text) => {
     const lines = text.trim().split('\n');
-    const schedule: { [key: string]: string[] } = {};
+    const schedule = {};
     
     lines.forEach(line => {
       const parts = line.split('/').map(s => s.trim());
@@ -76,13 +73,11 @@ export default function SmartTripAnalyzer() {
   };
 
   // 라우트를 개별 하위 라우트로 확장하는 함수
-  const expandRoutes = (route: string, trip1Volumes: any, trip2Volumes: any) => {
-    // 정확히 일치하는 라우트가 있으면 그대로 반환
+  const expandRoutes = (route, trip1Volumes, trip2Volumes) => {
     if (trip1Volumes[route] || trip2Volumes[route]) {
       return [route];
     }
 
-    // 511B, 529A 같은 경우 → 하위 라우트들을 찾아서 배열로 반환
     const pattern = new RegExp("^" + route + "\\d+$");
     const subRoutes = new Set();
     
@@ -111,7 +106,6 @@ export default function SmartTripAnalyzer() {
     const weekdays = ['일', '월', '화', '수', '목', '금', '토'];
     const weekday = weekdays[dateObj.getDay()];
 
-    // Trip2가 있으면 Trip2 물량만, 없으면 Trip1 물량 표시
     const hasTrip2 = result.trip2Total > 0;
     const tripLabel = hasTrip2 ? "Trip2" : "Trip1";
     const displayTotal = hasTrip2 ? result.trip2Total : result.trip1Total;
@@ -127,33 +121,27 @@ export default function SmartTripAnalyzer() {
       text += "📦 총 수량: " + displayTotal.toLocaleString() + "\n\n";
     }
 
-    result.workers.forEach(([worker, data]: any, index: any) => {
+    result.workers.forEach(([worker, data], index) => {
       const emoji = index === 0 ? '👑' : index === 1 ? '🥈' : index === 2 ? '🥉' : '👤';
-      
-      // 비율 계산: Trip2 / (Trip1 + Trip2) * 100 (Trip2가 있을 때만)
       const trip2Ratio = hasTrip2 && data.total > 0 ? ((data.trip2 / data.total) * 100).toFixed(2) : '0.00';
-      
-      // Trip2가 있으면 Trip2 물량만, 없으면 Trip1 물량 표시
       const displayVolume = hasTrip2 ? data.trip2 : data.trip1;
       const ratioText = hasTrip2 ? " (Trip2 비율: " + trip2Ratio + "%)" : "";
       
       text += emoji + " " + worker + " (합계: " + displayVolume + ")" + ratioText + "\n";
       
-      data.routes.forEach(({ route, trip1, trip2 }: any) => {
+      data.routes.forEach(({ route, trip1, trip2 }) => {
         const routeVolume = hasTrip2 ? trip2 : trip1;
         if (routeVolume > 0) {
           text += "  ∙ " + route + " (" + routeVolume + ")\n";
         }
       });
       
-      // Trip2가 있을 때만 금일 총합계 표시
       if (hasTrip2) {
         text += "[금일 총합계: " + data.total + "]\n";
       }
       text += "\n";
     });
 
-    // 모바일 환경 대응: textarea를 이용한 복사
     const textarea = document.createElement('textarea');
     textarea.value = text;
     textarea.style.position = 'fixed';
@@ -169,7 +157,6 @@ export default function SmartTripAnalyzer() {
       if (successful) {
         alert('✅ 복사 완료!');
       } else {
-        // Clipboard API 재시도
         if (navigator.clipboard && navigator.clipboard.writeText) {
           navigator.clipboard.writeText(text).then(() => {
             alert('✅ 복사 완료!');
@@ -194,7 +181,6 @@ export default function SmartTripAnalyzer() {
       return;
     }
 
-    // 날짜 검증
     const trip1Date = extractDate(trip1Data);
     const trip2Date = trip2Data ? extractDate(trip2Data) : null;
     const scheduleDate = extractDate(scheduleData);
@@ -209,7 +195,6 @@ export default function SmartTripAnalyzer() {
       return;
     }
 
-    // 날짜 일치 여부 확인
     if (trip1Date !== scheduleDate) {
       alert('❌ 날짜가 일치하지 않습니다!\n스케줄: ' + scheduleDate + '\nTrip1: ' + trip1Date);
       return;
@@ -220,15 +205,13 @@ export default function SmartTripAnalyzer() {
       return;
     }
 
-    // 날짜 저장
     setTargetDate(scheduleDate);
 
     const trip1Volumes = parseVolumeData(trip1Data);
     const trip2Volumes = trip2Data ? parseVolumeData(trip2Data) : {};
     const schedule = parseScheduleData(scheduleData);
 
-    // 각 담당자별 물량 계산
-    const workerVolumes: any = {};
+    const workerVolumes = {};
     
     Object.entries(schedule).forEach(([worker, routes]) => {
       let trip1Total = 0;
@@ -236,7 +219,6 @@ export default function SmartTripAnalyzer() {
       const routeDetails = [];
       
       routes.forEach(route => {
-        // 라우트를 개별 하위 라우트로 확장
         const expandedRoutes = expandRoutes(route, trip1Volumes, trip2Volumes);
         
         expandedRoutes.forEach(expandedRoute => {
@@ -265,7 +247,6 @@ export default function SmartTripAnalyzer() {
       };
     });
 
-    // 내림차순 정렬
     const sorted = Object.entries(workerVolumes)
       .sort((a, b) => b[1].total - a[1].total);
 
@@ -292,7 +273,6 @@ export default function SmartTripAnalyzer() {
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
-          {/* 스케줄 입력 */}
           <div className="bg-white rounded-lg shadow-lg p-6">
             <h2 className="text-xl font-bold text-purple-600 mb-4">
               👥 당일 스케줄
@@ -316,7 +296,6 @@ export default function SmartTripAnalyzer() {
             <p className="text-sm text-red-500 mt-1">* 날짜 필수: "12월 21일" 형식</p>
           </div>
 
-          {/* Trip1 물량 입력 */}
           <div className="bg-white rounded-lg shadow-lg p-6">
             <h2 className="text-xl font-bold text-blue-600 mb-4">
               📊 Trip1 물량 데이터
@@ -336,7 +315,6 @@ B&M로지스
             <p className="text-sm text-red-500 mt-2">* 날짜 필수: "25.12.21Trip1" 형식</p>
           </div>
 
-          {/* Trip2 물량 입력 */}
           <div className="bg-white rounded-lg shadow-lg p-6">
             <h2 className="text-xl font-bold text-green-600 mb-4">
               📊 Trip2 물량 데이터
@@ -358,7 +336,6 @@ B&M로지스
           </div>
         </div>
 
-        {/* 분석 버튼 */}
         <div className="text-center mb-8">
           <button
             onClick={analyze}
@@ -368,7 +345,6 @@ B&M로지스
           </button>
         </div>
 
-        {/* 결과 출력 */}
         {result && (
           <div className="bg-white rounded-lg shadow-lg p-8">
             <div className="mb-6 pb-4 border-b-2 border-gray-200">
@@ -413,7 +389,6 @@ B&M로지스
 
             <div className="space-y-4">
               {result.workers.map(([worker, data], index) => {
-                // 비율 계산: Trip2 / (Trip1 + Trip2) * 100
                 const trip2Ratio = data.total > 0 ? ((data.trip2 / data.total) * 100).toFixed(1) : 0;
                 
                 return (
@@ -463,18 +438,16 @@ B&M로지스
                     </div>
                     
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                      {data.routes.map(({ route, trip1, trip2, total }) => (
+                      {data.routes.map(({ route, trip1, trip2 }) => (
                         <div
                           key={route}
                           className="bg-white px-4 py-3 rounded-lg border border-gray-300"
                         >
                           <div className="font-semibold text-gray-700 mb-2">{route}</div>
                           {trip2 > 0 ? (
-                            <div className="space-y-1">
-                              <div className="flex justify-between items-center text-sm">
-                                <span className="text-green-600">T2:</span>
-                                <span className="font-bold text-green-700">{trip2}</span>
-                              </div>
+                            <div className="flex justify-between items-center text-sm">
+                              <span className="text-green-600">T2:</span>
+                              <span className="font-bold text-green-700">{trip2}</span>
                             </div>
                           ) : (
                             <div className="flex justify-between items-center">
