@@ -11,6 +11,8 @@ export default function SmartTripAnalyzer() {
 
   // 날짜 추출 함수
   const extractDate = (text) => {
+    if (!text || typeof text !== 'string') return null;
+    
     const dotMatch = text.match(/(\d{2,4})\.(\d{1,2})\.(\d{1,2})/);
     if (dotMatch) {
       let year = dotMatch[1];
