@@ -139,7 +139,7 @@ export default function SmartTripAnalyzer() {
       
       text += emoji + " " + worker + " (합계: " + displayVolume + ")" + ratioText + "\n";
       
-      data.routes.forEach(({ route, trip1, trip2 }) => {
+      data.routes.forEach(({ route, trip1, trip2 }: any) => {
         const routeVolume = hasTrip2 ? trip2 : trip1;
         if (routeVolume > 0) {
           text += "  ∙ " + route + " (" + routeVolume + ")\n";
