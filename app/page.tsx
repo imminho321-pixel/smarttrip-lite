@@ -10,16 +10,18 @@ export default function SmartTripAnalyzer() {
   const [targetDate, setTargetDate] = useState('');
   const [result, setResult] = useState(null);
 
-  // 날짜 추출 함수
+  // 날짜 추출 함수 (2026년 대응)
   const extractDate = (text) => {
     if (!text || typeof text !== 'string') return null;
     
+    // "25.12.21" 또는 "26.12.21" 형식 처리
     const dotMatch = text.match(/(\d{2,4})\.(\d{1,2})\.(\d{1,2})/);
     if (dotMatch) {
       let year = dotMatch[1];
       const month = dotMatch[2].padStart(2, '0');
       const day = dotMatch[3].padStart(2, '0');
       
+      // 2자리 연도를 4자리로 변환
       if (year.length === 2) {
         year = '20' + year;
       }
@@ -27,11 +29,32 @@ export default function SmartTripAnalyzer() {
       return year + '-' + month + '-' + day;
     }
     
+    // "12월 21일" 형식 처리 - 현재 연도 기준으로 판단
     const koreanMatch = text.match(/(\d{1,2})월\s*(\d{1,2})일/);
     if (koreanMatch) {
       const month = koreanMatch[1].padStart(2, '0');
       const day = koreanMatch[2].padStart(2, '0');
-      return '2025-' + month + '-' + day;
+      
+      // 현재 날짜 기준으로 연도 결정
+      const now = new Date();
+      const currentYear = now.getFullYear();
+      const currentMonth = now.getMonth() + 1; // 0-based
+      
+      // 입력된 월이 현재 월보다 작으면 다음 연도로 간주
+      // 예: 현재가 12월인데 1월 데이터면 다음 해
+      let targetYear = currentYear;
+      const inputMonth = parseInt(koreanMatch[1]);
+      
+      // 12월~1월 경계 처리
+      if (currentMonth === 12 && inputMonth <= 3) {
+        // 12월인데 1~3월 데이터면 다음 해
+        targetYear = currentYear + 1;
+      } else if (currentMonth <= 3 && inputMonth >= 10) {
+        // 1~3월인데 10~12월 데이터면 작년
+        targetYear = currentYear - 1;
+      }
+      
+      return targetYear + '-' + month + '-' + day;
     }
     
     return null;
@@ -104,6 +127,7 @@ export default function SmartTripAnalyzer() {
     if (!result || !targetDate) return;
 
     const dateObj = new Date(targetDate);
+    const year = dateObj.getFullYear();
     const month = dateObj.getMonth() + 1;
     const day = dateObj.getDate();
     const weekdays = ['일', '월', '화', '수', '목', '금', '토'];
@@ -114,7 +138,7 @@ export default function SmartTripAnalyzer() {
     const displayTotal = hasTrip2 ? result.trip2Total : result.trip1Total;
 
     let text = "(주)비앤엠(M_안성1)\n";
-    text += "2025년 " + month + "월 " + day + "일(" + weekday + ") " + tripLabel + "\n";
+    text += year + "년 " + month + "월 " + day + "일(" + weekday + ") " + tripLabel + "\n";
     
     if (hasTrip2) {
       const totalRatio = ((result.trip2Total / result.totalVolume) * 100).toFixed(2);
@@ -189,12 +213,12 @@ export default function SmartTripAnalyzer() {
     const scheduleDate = extractDate(scheduleData);
 
     if (!trip1Date) {
-      alert('⚠️ Trip1 물량 데이터에서 날짜를 찾을 수 없습니다.\n예: 25.12.21Trip1');
+      alert('⚠️ Trip1 물량 데이터에서 날짜를 찾을 수 없습니다.\n예: 26.01.15Trip1 또는 25.12.21Trip1');
       return;
     }
 
     if (!scheduleDate) {
-      alert('⚠️ 스케줄 데이터에서 날짜를 찾을 수 없습니다.\n예: 2W 입차일 : 12월 21일');
+      alert('⚠️ 스케줄 데이터에서 날짜를 찾을 수 없습니다.\n예: 2W 입차일 : 1월 15일');
       return;
     }
 
@@ -284,7 +308,7 @@ export default function SmartTripAnalyzer() {
               className="w-full h-64 p-4 border-2 border-gray-300 rounded-lg focus:border-purple-500 focus:outline-none font-mono text-sm bg-white text-gray-900"
               style={{ WebkitTextFillColor: '#111827', opacity: 1 }}
               placeholder="예시:
-2W 입차일 : 12월 21일 토요일
+2W 입차일 : 1월 15일 수요일
 출근인원 : 13명
 
 501B01 / 김병후
@@ -296,7 +320,7 @@ export default function SmartTripAnalyzer() {
               onChange={(e) => setScheduleData(e.target.value)}
             />
             <p className="text-sm text-gray-500 mt-2">* 511B, 529A 같은 표기는 전체 하위구역 포함</p>
-            <p className="text-sm text-red-500 mt-1">* 날짜 필수: "12월 21일" 형식</p>
+            <p className="text-sm text-red-500 mt-1">* 날짜 필수: "1월 15일" 형식</p>
           </div>
 
           <div className="bg-white rounded-lg shadow-lg p-6">
@@ -307,7 +331,7 @@ export default function SmartTripAnalyzer() {
               className="w-full h-64 p-4 border-2 border-gray-300 rounded-lg focus:border-blue-500 focus:outline-none font-mono text-sm bg-white text-gray-900"
               style={{ WebkitTextFillColor: '#111827', opacity: 1 }}
               placeholder="예시:
-25.12.21Trip1 캠도물량
+26.01.15Trip1 캠도물량
 B&M로지스
 501B01 | 24
 501B02 | 40
@@ -315,7 +339,7 @@ B&M로지스
               value={trip1Data}
               onChange={(e) => setTrip1Data(e.target.value)}
             />
-            <p className="text-sm text-red-500 mt-2">* 날짜 필수: "25.12.21Trip1" 형식</p>
+            <p className="text-sm text-red-500 mt-2">* 날짜 필수: "26.01.15Trip1" 형식</p>
           </div>
 
           <div className="bg-white rounded-lg shadow-lg p-6">
@@ -326,7 +350,7 @@ B&M로지스
               className="w-full h-64 p-4 border-2 border-gray-300 rounded-lg focus:border-green-500 focus:outline-none font-mono text-sm bg-white text-gray-900"
               style={{ WebkitTextFillColor: '#111827', opacity: 1 }}
               placeholder="예시 (선택사항):
-25.12.21Trip2 캠도물량
+26.01.15Trip2 캠도물량
 B&M로지스
 501B01 | 7
 501B02 | 15
@@ -335,7 +359,7 @@ B&M로지스
               onChange={(e) => setTrip2Data(e.target.value)}
             />
             <p className="text-sm text-gray-500 mt-2">* Trip2가 없으면 비워두세요</p>
-            <p className="text-sm text-red-500 mt-1">* 날짜 필수: "25.12.21Trip2" 형식</p>
+            <p className="text-sm text-red-500 mt-1">* 날짜 필수: "26.01.15Trip2" 형식</p>
           </div>
         </div>
 
