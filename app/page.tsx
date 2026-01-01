@@ -14,14 +14,12 @@ export default function SmartTripAnalyzer() {
   const extractDate = (text) => {
     if (!text || typeof text !== 'string') return null;
     
-    // "25.12.21" 또는 "26.12.21" 형식 처리
     const dotMatch = text.match(/(\d{2,4})\.(\d{1,2})\.(\d{1,2})/);
     if (dotMatch) {
       let year = dotMatch[1];
       const month = dotMatch[2].padStart(2, '0');
       const day = dotMatch[3].padStart(2, '0');
       
-      // 2자리 연도를 4자리로 변환
       if (year.length === 2) {
         year = '20' + year;
       }
@@ -29,28 +27,21 @@ export default function SmartTripAnalyzer() {
       return year + '-' + month + '-' + day;
     }
     
-    // "12월 21일" 형식 처리 - 현재 연도 기준으로 판단
     const koreanMatch = text.match(/(\d{1,2})월\s*(\d{1,2})일/);
     if (koreanMatch) {
       const month = koreanMatch[1].padStart(2, '0');
       const day = koreanMatch[2].padStart(2, '0');
       
-      // 현재 날짜 기준으로 연도 결정
       const now = new Date();
       const currentYear = now.getFullYear();
-      const currentMonth = now.getMonth() + 1; // 0-based
+      const currentMonth = now.getMonth() + 1;
       
-      // 입력된 월이 현재 월보다 작으면 다음 연도로 간주
-      // 예: 현재가 12월인데 1월 데이터면 다음 해
       let targetYear = currentYear;
       const inputMonth = parseInt(koreanMatch[1]);
       
-      // 12월~1월 경계 처리
       if (currentMonth === 12 && inputMonth <= 3) {
-        // 12월인데 1~3월 데이터면 다음 해
         targetYear = currentYear + 1;
       } else if (currentMonth <= 3 && inputMonth >= 10) {
-        // 1~3월인데 10~12월 데이터면 작년
         targetYear = currentYear - 1;
       }
       
@@ -60,7 +51,6 @@ export default function SmartTripAnalyzer() {
     return null;
   };
 
-  // 물량 데이터 파싱 함수
   const parseVolumeData = (text) => {
     const lines = text.trim().split('\n');
     const volumes = {};
@@ -77,7 +67,6 @@ export default function SmartTripAnalyzer() {
     return volumes;
   };
 
-  // 스케줄 데이터 파싱 함수
   const parseScheduleData = (text) => {
     const lines = text.trim().split('\n');
     const schedule = {};
@@ -98,7 +87,6 @@ export default function SmartTripAnalyzer() {
     return schedule;
   };
 
-  // 라우트를 개별 하위 라우트로 확장하는 함수
   const expandRoutes = (route, trip1Volumes, trip2Volumes) => {
     if (trip1Volumes[route] || trip2Volumes[route]) {
       return [route];
@@ -122,7 +110,6 @@ export default function SmartTripAnalyzer() {
     return subRoutes.size > 0 ? Array.from(subRoutes).sort() : [route];
   };
 
-  // 복사 기능
   const copyToClipboard = () => {
     if (!result || !targetDate) return;
 
@@ -201,7 +188,6 @@ export default function SmartTripAnalyzer() {
     }
   };
 
-  // 분석 실행
   const analyze = () => {
     if (!trip1Data || !scheduleData) {
       alert('⚠️ Trip1 물량과 스케줄을 모두 입력해주세요.');
@@ -290,24 +276,40 @@ export default function SmartTripAnalyzer() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 p-8">
-      <div className="max-w-7xl mx-auto">
-        <div className="text-center mb-8">
-          <h1 className="text-4xl font-bold text-gray-800 mb-2">
-            📦 SmartTrip 물량 분석기
-          </h1>
-          <p className="text-gray-600">스케줄 물량 데이터를 분석하고 정리하세요</p>
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50">
+      {/* 헤더 */}
+      <div className="bg-white shadow-sm border-b border-gray-200">
+        <div className="max-w-7xl mx-auto px-6 py-6">
+          <div className="flex items-center gap-4">
+            <div className="w-14 h-14 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-2xl flex items-center justify-center shadow-lg">
+              <span className="text-3xl">📦</span>
+            </div>
+            <div>
+              <h1 className="text-3xl font-bold bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent">
+                SmartTrip 물량 분석기
+              </h1>
+              <p className="text-sm text-gray-500 mt-1">스케줄 물량 데이터를 스마트하게 분석하세요</p>
+            </div>
+          </div>
         </div>
+      </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
-          <div className="bg-white rounded-lg shadow-lg p-6">
-            <h2 className="text-xl font-bold text-purple-600 mb-4">
-              👥 당일 스케줄
-            </h2>
-            <textarea
-              className="w-full h-64 p-4 border-2 border-gray-300 rounded-lg focus:border-purple-500 focus:outline-none font-mono text-sm bg-white text-gray-900"
-              style={{ WebkitTextFillColor: '#111827', opacity: 1 }}
-              placeholder="예시:
+      <div className="max-w-7xl mx-auto px-6 py-8">
+        {/* 입력 카드들 */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
+          {/* 당일 스케줄 */}
+          <div className="group">
+            <div className="bg-white rounded-2xl shadow-md hover:shadow-xl transition-all duration-300 overflow-hidden border border-gray-100">
+              <div className="bg-gradient-to-r from-purple-500 to-pink-500 px-6 py-4">
+                <div className="flex items-center gap-3">
+                  <span className="text-2xl">👥</span>
+                  <h2 className="text-xl font-bold text-white">당일 스케줄</h2>
+                </div>
+              </div>
+              <div className="p-6">
+                <textarea
+                  className="w-full h-64 p-4 border-2 border-gray-200 rounded-xl focus:border-purple-400 focus:ring-4 focus:ring-purple-100 focus:outline-none font-mono text-sm resize-none transition-all bg-gray-50 hover:bg-white"
+                  placeholder="📅 예시:
 2W 입차일 : 1월 15일 수요일
 출근인원 : 13명
 
@@ -316,178 +318,256 @@ export default function SmartTripAnalyzer() {
 511B / 임민호
 529A / 김진우
 ..."
-              value={scheduleData}
-              onChange={(e) => setScheduleData(e.target.value)}
-            />
-            <p className="text-sm text-gray-500 mt-2">* 511B, 529A 같은 표기는 전체 하위구역 포함</p>
-            <p className="text-sm text-red-500 mt-1">* 날짜 필수: "1월 15일" 형식</p>
+                  value={scheduleData}
+                  onChange={(e) => setScheduleData(e.target.value)}
+                />
+                <div className="mt-4 space-y-2">
+                  <div className="flex items-start gap-2 text-sm text-gray-600">
+                    <span>💡</span>
+                    <span>511B, 529A 같은 표기는 전체 하위구역 포함</span>
+                  </div>
+                  <div className="flex items-start gap-2 text-sm text-red-500 font-medium">
+                    <span>⚠️</span>
+                    <span>날짜 필수: "1월 15일" 형식</span>
+                  </div>
+                </div>
+              </div>
+            </div>
           </div>
 
-          <div className="bg-white rounded-lg shadow-lg p-6">
-            <h2 className="text-xl font-bold text-blue-600 mb-4">
-              📊 Trip1 물량 데이터
-            </h2>
-            <textarea
-              className="w-full h-64 p-4 border-2 border-gray-300 rounded-lg focus:border-blue-500 focus:outline-none font-mono text-sm bg-white text-gray-900"
-              style={{ WebkitTextFillColor: '#111827', opacity: 1 }}
-              placeholder="예시:
+          {/* Trip1 물량 */}
+          <div className="group">
+            <div className="bg-white rounded-2xl shadow-md hover:shadow-xl transition-all duration-300 overflow-hidden border border-gray-100">
+              <div className="bg-gradient-to-r from-blue-500 to-cyan-500 px-6 py-4">
+                <div className="flex items-center gap-3">
+                  <span className="text-2xl">📊</span>
+                  <h2 className="text-xl font-bold text-white">Trip1 물량 데이터</h2>
+                </div>
+              </div>
+              <div className="p-6">
+                <textarea
+                  className="w-full h-64 p-4 border-2 border-gray-200 rounded-xl focus:border-blue-400 focus:ring-4 focus:ring-blue-100 focus:outline-none font-mono text-sm resize-none transition-all bg-gray-50 hover:bg-white"
+                  placeholder="📦 예시:
 26.01.15Trip1 캠도물량
 B&M로지스
 501B01 | 24
 501B02 | 40
+511B01 | 35
 ..."
-              value={trip1Data}
-              onChange={(e) => setTrip1Data(e.target.value)}
-            />
-            <p className="text-sm text-red-500 mt-2">* 날짜 필수: "26.01.15Trip1" 형식</p>
+                  value={trip1Data}
+                  onChange={(e) => setTrip1Data(e.target.value)}
+                />
+                <div className="mt-4">
+                  <div className="flex items-start gap-2 text-sm text-red-500 font-medium">
+                    <span>⚠️</span>
+                    <span>날짜 필수: "26.01.15Trip1" 형식</span>
+                  </div>
+                </div>
+              </div>
+            </div>
           </div>
 
-          <div className="bg-white rounded-lg shadow-lg p-6">
-            <h2 className="text-xl font-bold text-green-600 mb-4">
-              📊 Trip2 물량 데이터
-            </h2>
-            <textarea
-              className="w-full h-64 p-4 border-2 border-gray-300 rounded-lg focus:border-green-500 focus:outline-none font-mono text-sm bg-white text-gray-900"
-              style={{ WebkitTextFillColor: '#111827', opacity: 1 }}
-              placeholder="예시 (선택사항):
+          {/* Trip2 물량 */}
+          <div className="group">
+            <div className="bg-white rounded-2xl shadow-md hover:shadow-xl transition-all duration-300 overflow-hidden border border-gray-100">
+              <div className="bg-gradient-to-r from-green-500 to-emerald-500 px-6 py-4">
+                <div className="flex items-center gap-3">
+                  <span className="text-2xl">📈</span>
+                  <h2 className="text-xl font-bold text-white">Trip2 물량 데이터</h2>
+                </div>
+              </div>
+              <div className="p-6">
+                <textarea
+                  className="w-full h-64 p-4 border-2 border-gray-200 rounded-xl focus:border-green-400 focus:ring-4 focus:ring-green-100 focus:outline-none font-mono text-sm resize-none transition-all bg-gray-50 hover:bg-white"
+                  placeholder="📦 예시 (선택사항):
 26.01.15Trip2 캠도물량
 B&M로지스
 501B01 | 7
 501B02 | 15
 ..."
-              value={trip2Data}
-              onChange={(e) => setTrip2Data(e.target.value)}
-            />
-            <p className="text-sm text-gray-500 mt-2">* Trip2가 없으면 비워두세요</p>
-            <p className="text-sm text-red-500 mt-1">* 날짜 필수: "26.01.15Trip2" 형식</p>
+                  value={trip2Data}
+                  onChange={(e) => setTrip2Data(e.target.value)}
+                />
+                <div className="mt-4 space-y-2">
+                  <div className="flex items-start gap-2 text-sm text-gray-600">
+                    <span>💡</span>
+                    <span>Trip2가 없으면 비워두세요</span>
+                  </div>
+                  <div className="flex items-start gap-2 text-sm text-red-500 font-medium">
+                    <span>⚠️</span>
+                    <span>날짜 필수: "26.01.15Trip2" 형식</span>
+                  </div>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
 
-        <div className="text-center mb-8">
+        {/* 분석 버튼 */}
+        <div className="flex justify-center mb-12">
           <button
             onClick={analyze}
-            className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-4 px-12 rounded-lg shadow-lg transform transition hover:scale-105"
+            className="group relative bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-bold py-5 px-16 rounded-2xl shadow-lg hover:shadow-2xl transform hover:scale-105 transition-all duration-300"
           >
-            🔍 분석 실행
+            <span className="flex items-center gap-3 text-lg">
+              <span className="text-2xl">🔍</span>
+              <span>분석 실행</span>
+            </span>
+            <div className="absolute inset-0 rounded-2xl bg-white opacity-0 group-hover:opacity-10 transition-opacity"></div>
           </button>
         </div>
 
+        {/* 결과 영역 */}
         {result && (
-          <div className="bg-white rounded-lg shadow-lg p-8">
-            <div className="mb-6 pb-4 border-b-2 border-gray-200">
-              <div className="flex items-center justify-between mb-4">
-                <h2 className="text-2xl font-bold text-gray-800">
-                  📈 분석 결과
-                </h2>
+          <div className="bg-white rounded-2xl shadow-xl border border-gray-100 overflow-hidden">
+            {/* 결과 헤더 */}
+            <div className="bg-gradient-to-r from-slate-700 to-slate-900 px-8 py-6">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-4">
+                  <span className="text-4xl">📈</span>
+                  <div>
+                    <h2 className="text-2xl font-bold text-white">분석 결과</h2>
+                    <p className="text-slate-300 text-sm mt-1">
+                      {new Date(targetDate).toLocaleDateString('ko-KR', { 
+                        year: 'numeric', 
+                        month: 'long', 
+                        day: 'numeric',
+                        weekday: 'long'
+                      })}
+                    </p>
+                  </div>
+                </div>
                 <button
                   onClick={copyToClipboard}
-                  className="bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-8 rounded-lg shadow-lg transform transition hover:scale-105 flex items-center gap-2"
+                  className="bg-white hover:bg-gray-100 text-gray-800 font-bold py-3 px-8 rounded-xl shadow-lg transform hover:scale-105 transition-all duration-200 flex items-center gap-2"
                 >
-                  📋 복사하기
+                  <span className="text-xl">📋</span>
+                  <span>복사하기</span>
                 </button>
               </div>
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-center">
-                <div className="bg-blue-50 rounded-lg p-4">
-                  <p className="text-gray-600 text-sm">Trip1 물량</p>
-                  <p className="text-2xl font-bold text-blue-600">
+            </div>
+
+            {/* 통계 카드들 */}
+            <div className="p-8">
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+                <div className="bg-gradient-to-br from-blue-50 to-blue-100 rounded-2xl p-6 border border-blue-200">
+                  <div className="flex items-center gap-2 mb-2">
+                    <span className="text-2xl">🚚</span>
+                    <p className="text-sm font-medium text-blue-700">Trip1 물량</p>
+                  </div>
+                  <p className="text-3xl font-bold text-blue-900">
                     {result.trip1Total.toLocaleString()}
                   </p>
                 </div>
-                <div className="bg-green-50 rounded-lg p-4">
-                  <p className="text-gray-600 text-sm">Trip2 물량</p>
-                  <p className="text-2xl font-bold text-green-600">
+
+                <div className="bg-gradient-to-br from-green-50 to-green-100 rounded-2xl p-6 border border-green-200">
+                  <div className="flex items-center gap-2 mb-2">
+                    <span className="text-2xl">🚛</span>
+                    <p className="text-sm font-medium text-green-700">Trip2 물량</p>
+                  </div>
+                  <p className="text-3xl font-bold text-green-900">
                     {result.trip2Total.toLocaleString()}
                   </p>
                 </div>
-                <div className="bg-purple-50 rounded-lg p-4">
-                  <p className="text-gray-600 text-sm">총 물량</p>
-                  <p className="text-2xl font-bold text-purple-600">
+
+                <div className="bg-gradient-to-br from-purple-50 to-purple-100 rounded-2xl p-6 border border-purple-200">
+                  <div className="flex items-center gap-2 mb-2">
+                    <span className="text-2xl">📦</span>
+                    <p className="text-sm font-medium text-purple-700">총 물량</p>
+                  </div>
+                  <p className="text-3xl font-bold text-purple-900">
                     {result.totalVolume.toLocaleString()}
                   </p>
                 </div>
-                <div className="bg-orange-50 rounded-lg p-4">
-                  <p className="text-gray-600 text-sm">출근 인원</p>
-                  <p className="text-2xl font-bold text-orange-600">
+
+                <div className="bg-gradient-to-br from-orange-50 to-orange-100 rounded-2xl p-6 border border-orange-200">
+                  <div className="flex items-center gap-2 mb-2">
+                    <span className="text-2xl">👷</span>
+                    <p className="text-sm font-medium text-orange-700">출근 인원</p>
+                  </div>
+                  <p className="text-3xl font-bold text-orange-900">
                     {result.workerCount}명
                   </p>
                 </div>
               </div>
-            </div>
 
-            <div className="space-y-4">
-              {result.workers.map(([worker, data], index) => {
-                const trip2Ratio = data.total > 0 ? ((data.trip2 / data.total) * 100).toFixed(1) : 0;
-                
-                return (
-                  <div
-                    key={worker}
-                    className={`p-5 rounded-lg border-l-4 ${
-                      index === 0
-                        ? 'bg-yellow-50 border-yellow-500'
-                        : index === 1
-                        ? 'bg-gray-50 border-gray-400'
-                        : index === 2
-                        ? 'bg-orange-50 border-orange-400'
-                        : 'bg-white border-blue-300'
-                    }`}
-                  >
-                    <div className="flex items-center justify-between mb-3">
-                      <div className="flex items-center gap-3">
-                        <span className="text-2xl">
-                          {index === 0 ? '👑' : index === 1 ? '🥈' : index === 2 ? '🥉' : '👤'}
-                        </span>
-                        <h3 className="text-xl font-bold text-gray-800">
-                          {worker}
-                        </h3>
-                      </div>
-                      <div className="text-right">
-                        <div className="space-y-2">
-                          {data.trip2 > 0 ? (
-                            <div className="bg-green-50 rounded px-3 py-2">
-                              <p className="text-xs text-green-600 font-medium">Trip2</p>
-                              <p className="text-2xl font-bold text-green-700">
-                                {data.trip2.toLocaleString()}
-                              </p>
-                              <p className="text-xs text-green-600 mt-1">
-                                비율: {trip2Ratio}%
+              {/* 작업자 목록 */}
+              <div className="space-y-4">
+                {result.workers.map(([worker, data], index) => {
+                  const trip2Ratio = data.total > 0 ? ((data.trip2 / data.total) * 100).toFixed(1) : 0;
+                  
+                  return (
+                    <div
+                      key={worker}
+                      className={`rounded-2xl border-2 overflow-hidden transition-all duration-300 hover:shadow-lg ${
+                        index === 0
+                          ? 'bg-gradient-to-r from-yellow-50 to-amber-50 border-yellow-400'
+                          : index === 1
+                          ? 'bg-gradient-to-r from-gray-50 to-slate-50 border-gray-300'
+                          : index === 2
+                          ? 'bg-gradient-to-r from-orange-50 to-red-50 border-orange-300'
+                          : 'bg-white border-gray-200'
+                      }`}
+                    >
+                      <div className="p-6">
+                        <div className="flex items-center justify-between mb-4">
+                          <div className="flex items-center gap-4">
+                            <span className="text-4xl">
+                              {index === 0 ? '👑' : index === 1 ? '🥈' : index === 2 ? '🥉' : '👤'}
+                            </span>
+                            <div>
+                              <h3 className="text-2xl font-bold text-gray-800">
+                                {worker}
+                              </h3>
+                              <p className="text-sm text-gray-500 mt-1">
+                                {index === 0 ? '최다 물량' : index === 1 ? '2위' : index === 2 ? '3위' : ''}
                               </p>
                             </div>
-                          ) : (
-                            <div className="bg-blue-50 rounded px-3 py-2">
-                              <p className="text-xs text-blue-600 font-medium">Trip1</p>
-                              <p className="text-2xl font-bold text-blue-700">
-                                {data.trip1.toLocaleString()}
-                              </p>
+                          </div>
+                          <div className="text-right">
+                            {data.trip2 > 0 ? (
+                              <div className="bg-white rounded-2xl px-6 py-4 shadow-md border-2 border-green-200">
+                                <p className="text-xs text-green-600 font-semibold mb-1">Trip2</p>
+                                <p className="text-4xl font-bold text-green-700">
+                                  {data.trip2.toLocaleString()}
+                                </p>
+                                <p className="text-xs text-green-600 mt-2">
+                                  비율: {trip2Ratio}%
+                                </p>
+                              </div>
+                            ) : (
+                              <div className="bg-white rounded-2xl px-6 py-4 shadow-md border-2 border-blue-200">
+                                <p className="text-xs text-blue-600 font-semibold mb-1">Trip1</p>
+                                <p className="text-4xl font-bold text-blue-700">
+                                  {data.trip1.toLocaleString()}
+                                </p>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                        
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                          {data.routes.map(({ route, trip1, trip2 }) => (
+                            <div
+                              key={route}
+                              className="bg-white rounded-xl px-4 py-3 shadow-sm border border-gray-200 hover:shadow-md transition-shadow"
+                            >
+                              <div className="flex items-center justify-between">
+                                <span className="font-semibold text-gray-700">{route}</span>
+                                {trip2 > 0 ? (
+                                  <span className="text-lg font-bold text-green-600">{trip2}</span>
+                                ) : (
+                                  <span className="text-lg font-bold text-blue-600">{trip1}</span>
+                                )}
+                              </div>
                             </div>
-                          )}
+                          ))}
                         </div>
                       </div>
                     </div>
-                    
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                      {data.routes.map(({ route, trip1, trip2 }) => (
-                        <div
-                          key={route}
-                          className="bg-white px-4 py-3 rounded-lg border border-gray-300"
-                        >
-                          <div className="font-semibold text-gray-700 mb-2">{route}</div>
-                          {trip2 > 0 ? (
-                            <div className="flex justify-between items-center text-sm">
-                              <span className="text-green-600">T2:</span>
-                              <span className="font-bold text-green-700">{trip2}</span>
-                            </div>
-                          ) : (
-                            <div className="flex justify-between items-center">
-                              <span className="text-blue-600 text-sm">T1:</span>
-                              <span className="font-bold text-blue-700">{trip1}</span>
-                            </div>
-                          )}
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                );
-              })}
+                  );
+                })}
+              </div>
             </div>
           </div>
         )}
