@@ -1,716 +1,671 @@
-<!DOCTYPE html>
-<html lang="ko">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>SmartTrip 물량 분석기</title>
-    <meta name="description" content="프리미엄 물량 데이터 분석 시스템">
-    <style>
-        @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700;900&display=swap');
-
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-
-        body {
-            font-family: 'Noto Sans KR', -apple-system, BlinkMacSystemFont, sans-serif;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            min-height: 100vh;
-            position: relative;
-            overflow-x: hidden;
-        }
-
-        body::before {
-            content: '';
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: 
-                radial-gradient(circle at 20% 50%, rgba(120, 119, 198, 0.3), transparent 50%),
-                radial-gradient(circle at 80% 80%, rgba(162, 155, 254, 0.3), transparent 50%),
-                radial-gradient(circle at 40% 20%, rgba(194, 233, 251, 0.3), transparent 50%);
-            animation: backgroundMove 20s ease-in-out infinite;
-            z-index: 0;
-        }
-
-        @keyframes backgroundMove {
-            0%, 100% { transform: translate(0, 0); }
-            50% { transform: translate(50px, 50px); }
-        }
-
-        .container {
-            max-width: 1400px;
-            margin: 0 auto;
-            padding: 0 2rem;
-            position: relative;
-            z-index: 1;
-        }
-
-        .header {
-            backdrop-filter: blur(20px);
-            background: rgba(255, 255, 255, 0.1);
-            border: 1px solid rgba(255, 255, 255, 0.2);
-            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
-            border-radius: 20px;
-            margin: 2rem 0;
-            padding: 2rem;
-            animation: slideDown 0.8s ease-out;
-        }
-
-        @keyframes slideDown {
-            from {
-                opacity: 0;
-                transform: translateY(-30px);
-            }
-            to {
-                opacity: 1;
-                transform: translateY(0);
-            }
-        }
-
-        .header-content {
-            display: flex;
-            align-items: center;
-            gap: 1.5rem;
-        }
-
-        .logo-box {
-            width: 80px;
-            height: 80px;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            border-radius: 20px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 3rem;
-            box-shadow: 
-                0 10px 40px rgba(102, 126, 234, 0.4),
-                inset 0 0 0 1px rgba(255, 255, 255, 0.2);
-            animation: float 3s ease-in-out infinite;
-        }
-
-        @keyframes float {
-            0%, 100% { transform: translateY(0px); }
-            50% { transform: translateY(-10px); }
-        }
-
-        .header-text h1 {
-            font-size: 2.5rem;
-            font-weight: 900;
-            color: white;
-            text-shadow: 0 2px 20px rgba(0, 0, 0, 0.2);
-            letter-spacing: -1px;
-        }
-
-        .header-text p {
-            font-size: 1rem;
-            color: rgba(255, 255, 255, 0.9);
-            margin-top: 0.5rem;
-            font-weight: 500;
-        }
-
-        .input-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
-            gap: 2rem;
-            margin: 2rem 0;
-        }
-
-        .card {
-            backdrop-filter: blur(20px);
-            background: rgba(255, 255, 255, 0.1);
-            border: 1px solid rgba(255, 255, 255, 0.2);
-            border-radius: 24px;
-            overflow: hidden;
-            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
-            transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
-            animation: fadeInUp 0.8s ease-out;
-            animation-fill-mode: both;
-        }
-
-        .card:nth-child(1) { animation-delay: 0.1s; }
-        .card:nth-child(2) { animation-delay: 0.2s; }
-        .card:nth-child(3) { animation-delay: 0.3s; }
-
-        @keyframes fadeInUp {
-            from {
-                opacity: 0;
-                transform: translateY(30px);
-            }
-            to {
-                opacity: 1;
-                transform: translateY(0);
-            }
-        }
-
-        .card:hover {
-            transform: translateY(-8px);
-            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
-            border-color: rgba(255, 255, 255, 0.4);
-        }
-
-        .card-header {
-            padding: 1.5rem;
-            display: flex;
-            align-items: center;
-            gap: 1rem;
-            position: relative;
-            overflow: hidden;
-        }
-
-        .card-header::before {
-            content: '';
-            position: absolute;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            z-index: 0;
-        }
-
-        .card-header.purple::before {
-            background: linear-gradient(135deg, #a855f7, #ec4899);
-        }
-
-        .card-header.blue::before {
-            background: linear-gradient(135deg, #3b82f6, #06b6d4);
-        }
-
-        .card-header.green::before {
-            background: linear-gradient(135deg, #10b981, #34d399);
-        }
-
-        .card-header-content {
-            position: relative;
-            z-index: 1;
-            display: flex;
-            align-items: center;
-            gap: 1rem;
-        }
-
-        .card-icon {
-            font-size: 2rem;
-            filter: drop-shadow(0 2px 4px rgba(0,0,0,0.2));
-        }
-
-        .card-header h2 {
-            color: white;
-            font-size: 1.4rem;
-            font-weight: 700;
-            text-shadow: 0 2px 10px rgba(0,0,0,0.2);
-        }
-
-        .card-body {
-            padding: 1.5rem;
-        }
-
-        textarea {
-            width: 100%;
-            height: 16rem;
-            padding: 1.2rem;
-            border: 2px solid rgba(255, 255, 255, 0.2);
-            border-radius: 16px;
-            font-family: 'Courier New', monospace;
-            font-size: 0.9rem;
-            resize: none;
-            background: rgba(255, 255, 255, 0.9);
-            backdrop-filter: blur(10px);
-            transition: all 0.3s ease;
-            color: #1f2937;
-        }
-
-        textarea:focus {
-            outline: none;
-            border-color: rgba(255, 255, 255, 0.6);
-            box-shadow: 
-                0 0 0 4px rgba(255, 255, 255, 0.1),
-                0 8px 20px rgba(0, 0, 0, 0.1);
-            background: white;
-        }
-
-        textarea::placeholder {
-            color: #9ca3af;
-        }
-
-        .card-footer {
-            margin-top: 1rem;
-            font-size: 0.875rem;
-        }
-
-        .hint, .warning {
-            padding: 0.75rem;
-            border-radius: 12px;
-            margin-top: 0.5rem;
-            backdrop-filter: blur(10px);
-            display: flex;
-            align-items: center;
-            gap: 0.5rem;
-        }
-
-        .hint {
-            background: rgba(59, 130, 246, 0.15);
-            color: white;
-            border: 1px solid rgba(59, 130, 246, 0.3);
-        }
-
-        .warning {
-            background: rgba(239, 68, 68, 0.15);
-            color: white;
-            border: 1px solid rgba(239, 68, 68, 0.3);
-            font-weight: 500;
-        }
-
-        .button-container {
-            display: flex;
-            justify-content: center;
-            margin: 3rem 0;
-        }
-
-        .btn-analyze {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-            font-weight: 700;
-            padding: 1.5rem 5rem;
-            border-radius: 20px;
-            border: none;
-            font-size: 1.3rem;
-            cursor: pointer;
-            box-shadow: 
-                0 10px 40px rgba(102, 126, 234, 0.4),
-                inset 0 0 0 1px rgba(255, 255, 255, 0.2);
-            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-            display: flex;
-            align-items: center;
-            gap: 1rem;
-            position: relative;
-            overflow: hidden;
-            animation: pulse 2s ease-in-out infinite;
-        }
-
-        @keyframes pulse {
-            0%, 100% {
-                box-shadow: 
-                    0 10px 40px rgba(102, 126, 234, 0.4),
-                    inset 0 0 0 1px rgba(255, 255, 255, 0.2);
-            }
-            50% {
-                box-shadow: 
-                    0 10px 40px rgba(102, 126, 234, 0.6),
-                    0 0 0 8px rgba(102, 126, 234, 0.1),
-                    inset 0 0 0 1px rgba(255, 255, 255, 0.3);
-            }
-        }
-
-        .btn-analyze::before {
-            content: '';
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            width: 0;
-            height: 0;
-            border-radius: 50%;
-            background: rgba(255, 255, 255, 0.3);
-            transform: translate(-50%, -50%);
-            transition: width 0.6s, height 0.6s;
-        }
-
-        .btn-analyze:hover::before {
-            width: 400px;
-            height: 400px;
-        }
-
-        .btn-analyze:hover {
-            transform: translateY(-4px) scale(1.05);
-            box-shadow: 
-                0 20px 60px rgba(102, 126, 234, 0.6),
-                inset 0 0 0 1px rgba(255, 255, 255, 0.3);
-        }
-
-        .btn-text {
-            position: relative;
-            z-index: 1;
-        }
-
-        .result-container {
-            backdrop-filter: blur(20px);
-            background: rgba(255, 255, 255, 0.95);
-            border-radius: 24px;
-            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.2);
-            border: 1px solid rgba(255, 255, 255, 0.3);
-            overflow: hidden;
-            margin-bottom: 3rem;
-            animation: scaleIn 0.5s cubic-bezier(0.4, 0, 0.2, 1);
-        }
-
-        @keyframes scaleIn {
-            from {
-                opacity: 0;
-                transform: scale(0.9);
-            }
-            to {
-                opacity: 1;
-                transform: scale(1);
-            }
-        }
-
-        .result-header {
-            background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
-            padding: 2.5rem;
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            position: relative;
-            overflow: hidden;
-        }
-
-        .result-header::before {
-            content: '';
-            position: absolute;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            background: 
-                radial-gradient(circle at 20% 50%, rgba(102, 126, 234, 0.2), transparent 50%),
-                radial-gradient(circle at 80% 50%, rgba(168, 85, 247, 0.2), transparent 50%);
-        }
-
-        .result-title {
-            display: flex;
-            align-items: center;
-            gap: 1.5rem;
-            position: relative;
-            z-index: 1;
-        }
-
-        .result-icon {
-            font-size: 3.5rem;
-        }
-
-        .result-title h2 {
-            color: white;
-            font-size: 2rem;
-            font-weight: 800;
-        }
-
-        .result-title p {
-            color: rgba(255, 255, 255, 0.8);
-            font-size: 1rem;
-            margin-top: 0.5rem;
-        }
-
-        .btn-copy {
-            background: white;
-            color: #1f2937;
-            font-weight: 700;
-            padding: 1rem 2.5rem;
-            border-radius: 16px;
-            border: none;
-            cursor: pointer;
-            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
-            transition: all 0.3s ease;
-            display: flex;
-            align-items: center;
-            gap: 0.75rem;
-            position: relative;
-            z-index: 1;
-            font-size: 1.1rem;
-        }
-
-        .btn-copy:hover {
-            transform: translateY(-4px);
-            box-shadow: 0 15px 40px rgba(0, 0, 0, 0.3);
-            background: linear-gradient(135deg, #f0f9ff, #e0f2fe);
-        }
-
-        .result-body {
-            padding: 2.5rem;
-        }
-
-        .stats-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-            gap: 1.5rem;
-            margin-bottom: 2.5rem;
-        }
-
-        .stat-card {
-            padding: 2rem;
-            border-radius: 20px;
-            background: linear-gradient(135deg, rgba(255,255,255,0.9), rgba(255,255,255,0.6));
-            border: 2px solid;
-            box-shadow: 0 8px 24px rgba(0,0,0,0.08);
-            transition: all 0.3s ease;
-        }
-
-        .stat-card:hover {
-            transform: translateY(-8px) scale(1.02);
-            box-shadow: 0 20px 40px rgba(0,0,0,0.15);
-        }
-
-        .stat-card.blue { border-color: #3b82f6; }
-        .stat-card.green { border-color: #10b981; }
-        .stat-card.purple { border-color: #8b5cf6; }
-        .stat-card.orange { border-color: #f59e0b; }
-
-        .stat-label {
-            display: flex;
-            align-items: center;
-            gap: 0.75rem;
-            margin-bottom: 1rem;
-            font-size: 0.95rem;
-            font-weight: 600;
-        }
-
-        .stat-value {
-            font-size: 2.5rem;
-            font-weight: 900;
-        }
-
-        .workers-list {
-            display: flex;
-            flex-direction: column;
-            gap: 1.5rem;
-        }
-
-        .worker-card {
-            border-radius: 20px;
-            border: 3px solid;
-            padding: 2rem;
-            background: white;
-            transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
-            position: relative;
-            overflow: hidden;
-        }
-
-        .worker-card::before {
-            content: '';
-            position: absolute;
-            top: 0;
-            left: 0;
-            right: 0;
-            height: 6px;
-        }
-
-        .worker-card.rank-1 { 
-            border-color: #fbbf24;
-            box-shadow: 0 8px 30px rgba(251, 191, 36, 0.3);
-        }
-        .worker-card.rank-1::before { background: linear-gradient(to right, #fbbf24, #f59e0b); }
-
-        .worker-card.rank-2 { 
-            border-color: #9ca3af;
-            box-shadow: 0 8px 30px rgba(156, 163, 175, 0.3);
-        }
-        .worker-card.rank-2::before { background: linear-gradient(to right, #9ca3af, #6b7280); }
-
-        .worker-card.rank-3 { 
-            border-color: #f97316;
-            box-shadow: 0 8px 30px rgba(249, 115, 22, 0.3);
-        }
-        .worker-card.rank-3::before { background: linear-gradient(to right, #f97316, #ea580c); }
-
-        .worker-card.rank-other { 
-            border-color: #e5e7eb;
-            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
-        }
-
-        .worker-card:hover {
-            transform: translateX(8px);
-            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.15);
-        }
-
-        .worker-header {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            margin-bottom: 1.5rem;
-        }
-
-        .worker-info {
-            display: flex;
-            align-items: center;
-            gap: 1.5rem;
-        }
-
-        .worker-emoji {
-            font-size: 3.5rem;
-        }
-
-        .worker-name {
-            font-size: 2rem;
-            font-weight: 800;
-            color: #1f2937;
-        }
-
-        .worker-volume {
-            background: linear-gradient(135deg, #f8fafc, #f1f5f9);
-            border-radius: 16px;
-            padding: 1.2rem 2rem;
-            box-shadow: 0 4px 20px rgba(0,0,0,0.08);
-            border: 2px solid;
-            text-align: center;
-            min-width: 140px;
-        }
-
-        .worker-volume.trip2 { border-color: #10b981; }
-        .worker-volume.trip1 { border-color: #3b82f6; }
-
-        .volume-label {
-            font-size: 0.8rem;
-            font-weight: 700;
-            margin-bottom: 0.5rem;
-        }
-
-        .volume-value {
-            font-size: 2.8rem;
-            font-weight: 900;
-        }
-
-        .volume-ratio {
-            font-size: 0.8rem;
-            margin-top: 0.5rem;
-            font-weight: 600;
-        }
-
-        .routes-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
-            gap: 1rem;
-        }
-
-        .route-item {
-            background: linear-gradient(135deg, #f8fafc, #f1f5f9);
-            border-radius: 12px;
-            padding: 1rem 1.2rem;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.05);
-            border: 2px solid #e5e7eb;
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            transition: all 0.3s ease;
-        }
-
-        .route-item:hover {
-            transform: translateY(-4px);
-            box-shadow: 0 8px 20px rgba(0,0,0,0.1);
-        }
-
-        .route-name {
-            font-weight: 700;
-            color: #374151;
-        }
-
-        .route-volume {
-            font-size: 1.4rem;
-            font-weight: 900;
-        }
-
-        .route-volume.trip2 { color: #059669; }
-        .route-volume.trip1 { color: #2563eb; }
-
-        .hidden {
-            display: none;
-        }
-
-        @media (max-width: 768px) {
-            .header-text h1 { font-size: 1.8rem; }
-            .input-grid { grid-template-columns: 1fr; }
-            .stats-grid { grid-template-columns: repeat(2, 1fr); }
-            .worker-header { flex-direction: column; gap: 1rem; }
-            .btn-analyze { padding: 1.2rem 3rem; font-size: 1.1rem; }
-        }
-    </style>
-</head>
-<body>
-    <div class="container">
-        <div class="header">
-            <div class="header-content">
-                <div class="logo-box">📦</div>
-                <div class="header-text">
-                    <h1>SmartTrip 물량 분석기</h1>
-                    <p>프리미엄 물량 데이터 분석 시스템</p>
-                </div>
+'use client';
+
+import { useState } from 'react';
+
+export default function SmartTripAnalyzer() {
+  const [trip1Data, setTrip1Data] = useState('');
+  const [trip2Data, setTrip2Data] = useState('');
+  const [scheduleData, setScheduleData] = useState('');
+  const [targetDate, setTargetDate] = useState('');
+  const [result, setResult] = useState<any>(null);
+
+  const extractDate = (text: string) => {
+    if (!text || typeof text !== 'string') return null;
+    
+    const dotMatch = text.match(/(\d{2,4})\.(\d{1,2})\.(\d{1,2})/);
+    if (dotMatch) {
+      let year = dotMatch[1];
+      const month = dotMatch[2].padStart(2, '0');
+      const day = dotMatch[3].padStart(2, '0');
+      if (year.length === 2) year = '20' + year;
+      return year + '-' + month + '-' + day;
+    }
+    
+    const koreanMatch = text.match(/(\d{1,2})월\s*(\d{1,2})일/);
+    if (koreanMatch) {
+      const month = koreanMatch[1].padStart(2, '0');
+      const day = koreanMatch[2].padStart(2, '0');
+      const now = new Date();
+      let targetYear = now.getFullYear();
+      const currentMonth = now.getMonth() + 1;
+      const inputMonth = parseInt(koreanMatch[1]);
+      if (currentMonth === 12 && inputMonth <= 3) targetYear++;
+      else if (currentMonth <= 3 && inputMonth >= 10) targetYear--;
+      return targetYear + '-' + month + '-' + day;
+    }
+    
+    return null;
+  };
+
+  const parseVolumeData = (text: string) => {
+    const lines = text.trim().split('\n');
+    const volumes: Record<string, number> = {};
+    lines.forEach(line => {
+      const parts = line.split('|').map(s => s.trim());
+      if (parts.length >= 2 && parts[0] && !parts[0].includes('B&M') && !parts[0].includes('캠도물량')) {
+        volumes[parts[0]] = parseInt(parts[1]) || 0;
+      }
+    });
+    return volumes;
+  };
+
+  const parseScheduleData = (text: string) => {
+    const lines = text.trim().split('\n');
+    const schedule: Record<string, string[]> = {};
+    lines.forEach(line => {
+      const parts = line.split('/').map(s => s.trim());
+      if (parts.length >= 2) {
+        if (!schedule[parts[1]]) schedule[parts[1]] = [];
+        schedule[parts[1]].push(parts[0]);
+      }
+    });
+    return schedule;
+  };
+
+  const expandRoutes = (route: string, trip1Volumes: Record<string, number>, trip2Volumes: Record<string, number>) => {
+    if (trip1Volumes[route] || trip2Volumes[route]) return [route];
+    const pattern = new RegExp("^" + route + "\\d+$");
+    const subRoutes = new Set<string>();
+    Object.keys(trip1Volumes).forEach(key => { if (pattern.test(key)) subRoutes.add(key); });
+    Object.keys(trip2Volumes).forEach(key => { if (pattern.test(key)) subRoutes.add(key); });
+    return subRoutes.size > 0 ? Array.from(subRoutes).sort() : [route];
+  };
+
+  const analyze = () => {
+    if (!trip1Data || !scheduleData) {
+      alert('⚠️ Trip1 물량과 스케줄을 모두 입력해주세요.');
+      return;
+    }
+
+    const trip1Date = extractDate(trip1Data);
+    const trip2Date = trip2Data ? extractDate(trip2Data) : null;
+    const scheduleDate = extractDate(scheduleData);
+
+    if (!trip1Date || !scheduleDate) {
+      alert('⚠️ 날짜를 찾을 수 없습니다.');
+      return;
+    }
+
+    if (trip1Date !== scheduleDate || (trip2Date && trip2Date !== scheduleDate)) {
+      alert('❌ 날짜가 일치하지 않습니다!');
+      return;
+    }
+
+    setTargetDate(scheduleDate);
+    const trip1Volumes = parseVolumeData(trip1Data);
+    const trip2Volumes = trip2Data ? parseVolumeData(trip2Data) : {};
+    const schedule = parseScheduleData(scheduleData);
+
+    const workerVolumes: any = {};
+    Object.entries(schedule).forEach(([worker, routes]) => {
+      let trip1Total = 0, trip2Total = 0;
+      const routeDetails: any[] = [];
+      routes.forEach(route => {
+        expandRoutes(route, trip1Volumes, trip2Volumes).forEach(expandedRoute => {
+          const t1Vol = trip1Volumes[expandedRoute] || 0;
+          const t2Vol = trip2Volumes[expandedRoute] || 0;
+          trip1Total += t1Vol;
+          trip2Total += t2Vol;
+          if (t1Vol > 0 || t2Vol > 0) {
+            routeDetails.push({ route: expandedRoute, trip1: t1Vol, trip2: t2Vol, total: t1Vol + t2Vol });
+          }
+        });
+      });
+      workerVolumes[worker] = { trip1: trip1Total, trip2: trip2Total, total: trip1Total + trip2Total, routes: routeDetails };
+    });
+
+    const sorted = Object.entries(workerVolumes).sort((a: any, b: any) => b[1].total - a[1].total);
+    const totalTrip1 = Object.values(trip1Volumes).reduce((a, b) => a + b, 0);
+    const totalTrip2 = Object.values(trip2Volumes).reduce((a, b) => a + b, 0);
+
+    setResult({
+      workers: sorted,
+      trip1Total: totalTrip1,
+      trip2Total: totalTrip2,
+      totalVolume: totalTrip1 + totalTrip2,
+      workerCount: sorted.length
+    });
+  };
+
+  const copyToClipboard = () => {
+    if (!result || !targetDate) return;
+    
+    const dateObj = new Date(targetDate);
+    const year = dateObj.getFullYear();
+    const month = dateObj.getMonth() + 1;
+    const day = dateObj.getDate();
+    const weekdays = ['일', '월', '화', '수', '목', '금', '토'];
+    const weekday = weekdays[dateObj.getDay()];
+    const hasTrip2 = result.trip2Total > 0;
+    const tripLabel = hasTrip2 ? "Trip2" : "Trip1";
+    const displayTotal = hasTrip2 ? result.trip2Total : result.trip1Total;
+
+    let text = "(주)비앤엠(M_안성1)\n";
+    text += year + "년 " + month + "월 " + day + "일(" + weekday + ") " + tripLabel + "\n";
+
+    if (hasTrip2) {
+      const totalRatio = ((result.trip2Total / result.totalVolume) * 100).toFixed(2);
+      text += "📦 총 수량: " + displayTotal.toLocaleString() + " (비율 " + totalRatio + "%)\n";
+      text += "📊 금일 총 수량: " + result.totalVolume.toLocaleString() + " (Trip1 + Trip2)\n\n";
+    } else {
+      text += "📦 총 수량: " + displayTotal.toLocaleString() + "\n\n";
+    }
+
+    result.workers.forEach(([worker, data]: any, index: number) => {
+      const emoji = index === 0 ? '👑' : index === 1 ? '🥈' : index === 2 ? '🥉' : '👤';
+      const trip2Ratio = hasTrip2 && data.total > 0 ? ((data.trip2 / data.total) * 100).toFixed(2) : '0.00';
+      const displayVolume = hasTrip2 ? data.trip2 : data.trip1;
+      const ratioText = hasTrip2 ? " (비율: " + trip2Ratio + "%)" : "";
+
+      text += emoji + " " + worker + " (합계: " + displayVolume + ")" + ratioText + "\n";
+
+      data.routes.forEach(({ route, trip1, trip2 }: any) => {
+        const routeVolume = hasTrip2 ? trip2 : trip1;
+        if (routeVolume > 0) {
+          text += "  ∙ " + route + " (" + routeVolume + ")\n";
+        }
+      });
+
+      if (hasTrip2) {
+        text += "[금일 총합계: " + data.total + "]\n";
+      }
+      text += "\n";
+    });
+
+    navigator.clipboard.writeText(text).then(() => {
+      alert('✅ 복사 완료!');
+    }).catch(() => {
+      alert('❌ 복사 실패');
+    });
+  };
+
+  return (
+    <div style={{ 
+      fontFamily: "'Noto Sans KR', -apple-system, BlinkMacSystemFont, sans-serif",
+      background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+      minHeight: '100vh',
+      padding: '2rem',
+      position: 'relative'
+    }}>
+      <div style={{ maxWidth: '1400px', margin: '0 auto', position: 'relative', zIndex: 1 }}>
+        {/* 헤더 */}
+        <div style={{
+          backdropFilter: 'blur(20px)',
+          background: 'rgba(255, 255, 255, 0.1)',
+          border: '1px solid rgba(255, 255, 255, 0.2)',
+          boxShadow: '0 8px 32px rgba(0, 0, 0, 0.1)',
+          borderRadius: '20px',
+          padding: '2rem',
+          marginBottom: '2rem'
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '1.5rem' }}>
+            <div style={{
+              width: '80px',
+              height: '80px',
+              background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+              borderRadius: '20px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              fontSize: '3rem',
+              boxShadow: '0 10px 40px rgba(102, 126, 234, 0.4)'
+            }}>📦</div>
+            <div>
+              <h1 style={{ fontSize: '2.5rem', fontWeight: 900, color: 'white', margin: 0, letterSpacing: '-1px' }}>
+                SmartTrip 물량 분석기
+              </h1>
+              <p style={{ fontSize: '1rem', color: 'rgba(255, 255, 255, 0.9)', marginTop: '0.5rem', fontWeight: 500 }}>
+                프리미엄 물량 데이터 분석 시스템
+              </p>
             </div>
+          </div>
         </div>
 
-        <div class="input-grid">
-            <div class="card">
-                <div class="card-header purple">
-                    <div class="card-header-content">
-                        <span class="card-icon">👥</span>
-                        <h2>당일 스케줄</h2>
-                    </div>
-                </div>
-                <div class="card-body">
-                    <textarea id="scheduleInput" placeholder="📅 예시:
-2W 입차일 : 1월 15일 수요일
-출근인원 : 13명
-
-501B01 / 김병후
-501B02 / 김병후
-511B / 임민호
-..."></textarea>
-                    <div class="card-footer">
-                        <div class="hint">💡 511B, 529A 같은 표기는 전체 하위구역 포함</div>
-                        <div class="warning">⚠️ 날짜 필수: "1월 15일" 형식</div>
-                    </div>
-                </div>
+        {/* 입력 카드들 */}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(350px, 1fr))', gap: '2rem', marginBottom: '3rem' }}>
+          {/* 스케줄 입력 */}
+          <div style={{ 
+            backdropFilter: 'blur(20px)',
+            background: 'rgba(255, 255, 255, 0.1)',
+            border: '1px solid rgba(255, 255, 255, 0.2)',
+            borderRadius: '24px',
+            overflow: 'hidden',
+            boxShadow: '0 8px 32px rgba(0, 0, 0, 0.1)',
+            transition: 'all 0.4s'
+          }}>
+            <div style={{ 
+              background: 'linear-gradient(135deg, #a855f7, #ec4899)', 
+              padding: '1.5rem',
+              color: 'white',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '1rem'
+            }}>
+              <span style={{ fontSize: '2rem' }}>👥</span>
+              <h2 style={{ fontSize: '1.4rem', fontWeight: 700, margin: 0 }}>당일 스케줄</h2>
             </div>
-
-            <div class="card">
-                <div class="card-header blue">
-                    <div class="card-header-content">
-                        <span class="card-icon">📊</span>
-                        <h2>Trip1 물량 데이터</h2>
-                    </div>
+            <div style={{ padding: '1.5rem' }}>
+              <textarea
+                value={scheduleData}
+                onChange={(e) => setScheduleData(e.target.value)}
+                placeholder="📅 예시:&#10;2W 입차일 : 1월 15일 수요일&#10;출근인원 : 13명&#10;&#10;501B01 / 김병후&#10;501B02 / 김병후&#10;511B / 임민호&#10;..."
+                style={{
+                  width: '100%',
+                  height: '16rem',
+                  padding: '1.2rem',
+                  border: '2px solid rgba(255, 255, 255, 0.2)',
+                  borderRadius: '16px',
+                  fontFamily: "'Courier New', monospace",
+                  fontSize: '0.9rem',
+                  resize: 'none',
+                  background: 'rgba(255, 255, 255, 0.9)',
+                  color: '#1f2937',
+                  transition: 'all 0.3s'
+                }}
+              />
+              <div style={{ marginTop: '1rem', fontSize: '0.875rem' }}>
+                <div style={{ 
+                  padding: '0.75rem', 
+                  borderRadius: '12px', 
+                  background: 'rgba(59, 130, 246, 0.15)', 
+                  color: 'white',
+                  border: '1px solid rgba(59, 130, 246, 0.3)',
+                  marginBottom: '0.5rem'
+                }}>
+                  💡 511B, 529A 같은 표기는 전체 하위구역 포함
                 </div>
-                <div class="card-body">
-                    <textarea id="trip1Input" placeholder="📦 예시:
-26.01.15Trip1 캠도물량
-B&M로지스
-501B01 | 24
-501B02 | 40
-..."></textarea>
-                    <div class="card-footer">
-                        <div class="warning">⚠️ 날짜 필수: "26.01.15Trip1" 형식</div>
-                    </div>
+                <div style={{ 
+                  padding: '0.75rem', 
+                  borderRadius: '12px', 
+                  background: 'rgba(239, 68, 68, 0.15)', 
+                  color: 'white',
+                  border: '1px solid rgba(239, 68, 68, 0.3)',
+                  fontWeight: 500
+                }}>
+                  ⚠️ 날짜 필수: "1월 15일" 형식
                 </div>
+              </div>
             </div>
+          </div>
 
-            <div class="card">
-                <div class="card-header green">
-                    <div class="card-header-content">
-                        <span class="card-icon">📈</span>
-                        <h2>Trip2 물량 데이터</h2>
-                    </div>
-                </div>
-                <div class="card-body">
-                    <textarea id="trip2Input" placeholder="📦 예시 (선택):
-26.01.15Trip2 캠도물량
-..."></textarea>
-                    <div class="card-footer">
-                        <div class="hint">💡 Trip2가 없으면 비워두세요</div>
-                        <div class="warning">⚠️ 날짜 필수: "26.01.15Trip2" 형식</div>
-                    </div>
-                </div>
+          {/* Trip1 입력 */}
+          <div style={{ 
+            backdropFilter: 'blur(20px)',
+            background: 'rgba(255, 255, 255, 0.1)',
+            border: '1px solid rgba(255, 255, 255, 0.2)',
+            borderRadius: '24px',
+            overflow: 'hidden',
+            boxShadow: '0 8px 32px rgba(0, 0, 0, 0.1)'
+          }}>
+            <div style={{ 
+              background: 'linear-gradient(135deg, #3b82f6, #06b6d4)', 
+              padding: '1.5rem',
+              color: 'white',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '1rem'
+            }}>
+              <span style={{ fontSize: '2rem' }}>📊</span>
+              <h2 style={{ fontSize: '1.4rem', fontWeight: 700, margin: 0 }}>Trip1 물량 데이터</h2>
             </div>
+            <div style={{ padding: '1.5rem' }}>
+              <textarea
+                value={trip1Data}
+                onChange={(e) => setTrip1Data(e.target.value)}
+                placeholder="📦 예시:&#10;26.01.15Trip1 캠도물량&#10;B&M로지스&#10;501B01 | 24&#10;501B02 | 40&#10;..."
+                style={{
+                  width: '100%',
+                  height: '16rem',
+                  padding: '1.2rem',
+                  border: '2px solid rgba(255, 255, 255, 0.2)',
+                  borderRadius: '16px',
+                  fontFamily: "'Courier New', monospace",
+                  fontSize: '0.9rem',
+                  resize: 'none',
+                  background: 'rgba(255, 255, 255, 0.9)',
+                  color: '#1f2937'
+                }}
+              />
+              <div style={{ marginTop: '1rem', fontSize: '0.875rem' }}>
+                <div style={{ 
+                  padding: '0.75rem', 
+                  borderRadius: '12px', 
+                  background: 'rgba(239, 68, 68, 0.15)', 
+                  color: 'white',
+                  border: '1px solid rgba(239, 68, 68, 0.3)',
+                  fontWeight: 500
+                }}>
+                  ⚠️ 날짜 필수: "26.01.15Trip1" 형식
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Trip2 입력 */}
+          <div style={{ 
+            backdropFilter: 'blur(20px)',
+            background: 'rgba(255, 255, 255, 0.1)',
+            border: '1px solid rgba(255, 255, 255, 0.2)',
+            borderRadius: '24px',
+            overflow: 'hidden',
+            boxShadow: '0 8px 32px rgba(0, 0, 0, 0.1)'
+          }}>
+            <div style={{ 
+              background: 'linear-gradient(135deg, #10b981, #34d399)', 
+              padding: '1.5rem',
+              color: 'white',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '1rem'
+            }}>
+              <span style={{ fontSize: '2rem' }}>📈</span>
+              <h2 style={{ fontSize: '1.4rem', fontWeight: 700, margin: 0 }}>Trip2 물량 데이터</h2>
+            </div>
+            <div style={{ padding: '1.5rem' }}>
+              <textarea
+                value={trip2Data}
+                onChange={(e) => setTrip2Data(e.target.value)}
+                placeholder="📦 예시 (선택):&#10;26.01.15Trip2 캠도물량&#10;B&M로지스&#10;501B01 | 7&#10;501B02 | 15&#10;..."
+                style={{
+                  width: '100%',
+                  height: '16rem',
+                  padding: '1.2rem',
+                  border: '2px solid rgba(255, 255, 255, 0.2)',
+                  borderRadius: '16px',
+                  fontFamily: "'Courier New', monospace",
+                  fontSize: '0.9rem',
+                  resize: 'none',
+                  background: 'rgba(255, 255, 255, 0.9)',
+                  color: '#1f2937'
+                }}
+              />
+              <div style={{ marginTop: '1rem', fontSize: '0.875rem' }}>
+                <div style={{ 
+                  padding: '0.75rem', 
+                  borderRadius: '12px', 
+                  background: 'rgba(59, 130, 246, 0.15)', 
+                  color: 'white',
+                  border: '1px solid rgba(59, 130, 246, 0.3)',
+                  marginBottom: '0.5rem'
+                }}>
+                  💡 Trip2가 없으면 비워두세요
+                </div>
+                <div style={{ 
+                  padding: '0.75rem', 
+                  borderRadius: '12px', 
+                  background: 'rgba(239, 68, 68, 0.15)', 
+                  color: 'white',
+                  border: '1px solid rgba(239, 68, 68, 0.3)',
+                  fontWeight: 500
+                }}>
+                  ⚠️ 날짜 필수: "26.01.15Trip2" 형식
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
 
-        <div class="button-container">
-            <button class="btn-analyze" onclick="analyze()">
-                <span style="font-size: 2rem;">🔍</span>
-                <span class="btn-text">분석 실행</span>
-            </button>
+        {/* 분석 버튼 */}
+        <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '3rem' }}>
+          <button
+            onClick={analyze}
+            style={{
+              background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+              color: 'white',
+              fontWeight: 700,
+              padding: '1.5rem 5rem',
+              borderRadius: '20px',
+              border: 'none',
+              fontSize: '1.3rem',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '1rem',
+              boxShadow: '0 10px 40px rgba(102, 126, 234, 0.4)',
+              transition: 'all 0.3s'
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.transform = 'translateY(-4px) scale(1.05)';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.transform = 'translateY(0) scale(1)';
+            }}
+          >
+            <span style={{ fontSize: '2rem' }}>🔍</span>
+            <span>분석 실행</span>
+          </button>
         </div>
 
-        <div id="resultContainer" class="hidden"></div>
+        {/* 결과 표시 */}
+        {result && (
+          <div style={{
+            backdropFilter: 'blur(20px)',
+            background: 'rgba(255, 255, 255, 0.95)',
+            borderRadius: '24px',
+            boxShadow: '0 20px 60px rgba(0, 0, 0, 0.2)',
+            border: '1px solid rgba(255, 255, 255, 0.3)',
+            overflow: 'hidden',
+            marginBottom: '3rem'
+          }}>
+            {/* 결과 헤더 */}
+            <div style={{
+              background: 'linear-gradient(135deg, #1e293b 0%, #0f172a 100%)',
+              padding: '2.5rem',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between'
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '1.5rem' }}>
+                <span style={{ fontSize: '3.5rem' }}>📈</span>
+                <div>
+                  <h2 style={{ fontSize: '2rem', fontWeight: 800, color: 'white', margin: 0 }}>분석 결과</h2>
+                  <p style={{ fontSize: '1rem', color: 'rgba(255, 255, 255, 0.8)', marginTop: '0.5rem' }}>
+                    {new Date(targetDate).toLocaleDateString('ko-KR', {
+                      year: 'numeric',
+                      month: 'long',
+                      day: 'numeric',
+                      weekday: 'long'
+                    })}
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={copyToClipboard}
+                style={{
+                  background: 'white',
+                  color: '#1f2937',
+                  fontWeight: 700,
+                  padding: '1rem 2.5rem',
+                  borderRadius: '16px',
+                  border: 'none',
+                  cursor: 'pointer',
+                  fontSize: '1.1rem',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.75rem'
+                }}
+              >
+                <span style={{ fontSize: '1.5rem' }}>📋</span>
+                <span>복사하기</span>
+              </button>
+            </div>
+
+            {/* 통계 카드 */}
+            <div style={{ padding: '2.5rem' }}>
+              <div style={{
+                display: 'grid',
+                gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
+                gap: '1.5rem',
+                marginBottom: '2.5rem'
+              }}>
+                <div style={{
+                  padding: '2rem',
+                  borderRadius: '20px',
+                  background: 'linear-gradient(135deg, rgba(255,255,255,0.9), rgba(255,255,255,0.6))',
+                  border: '2px solid #3b82f6',
+                  boxShadow: '0 8px 24px rgba(0,0,0,0.08)'
+                }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '1rem' }}>
+                    <span style={{ fontSize: '1.5rem' }}>🚚</span>
+                    <span style={{ fontSize: '0.95rem', fontWeight: 600, color: '#1e40af' }}>Trip1 물량</span>
+                  </div>
+                  <div style={{ fontSize: '2.5rem', fontWeight: 900, color: '#1e3a8a' }}>
+                    {result.trip1Total.toLocaleString()}
+                  </div>
+                </div>
+
+                <div style={{
+                  padding: '2rem',
+                  borderRadius: '20px',
+                  background: 'linear-gradient(135deg, rgba(255,255,255,0.9), rgba(255,255,255,0.6))',
+                  border: '2px solid #10b981',
+                  boxShadow: '0 8px 24px rgba(0,0,0,0.08)'
+                }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '1rem' }}>
+                    <span style={{ fontSize: '1.5rem' }}>🚛</span>
+                    <span style={{ fontSize: '0.95rem', fontWeight: 600, color: '#065f46' }}>Trip2 물량</span>
+                  </div>
+                  <div style={{ fontSize: '2.5rem', fontWeight: 900, color: '#064e3b' }}>
+                    {result.trip2Total.toLocaleString()}
+                  </div>
+                </div>
+
+                <div style={{
+                  padding: '2rem',
+                  borderRadius: '20px',
+                  background: 'linear-gradient(135deg, rgba(255,255,255,0.9), rgba(255,255,255,0.6))',
+                  border: '2px solid #8b5cf6',
+                  boxShadow: '0 8px 24px rgba(0,0,0,0.08)'
+                }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '1rem' }}>
+                    <span style={{ fontSize: '1.5rem' }}>📦</span>
+                    <span style={{ fontSize: '0.95rem', fontWeight: 600, color: '#6b21a8' }}>총 물량</span>
+                  </div>
+                  <div style={{ fontSize: '2.5rem', fontWeight: 900, color: '#581c87' }}>
+                    {result.totalVolume.toLocaleString()}
+                  </div>
+                </div>
+
+                <div style={{
+                  padding: '2rem',
+                  borderRadius: '20px',
+                  background: 'linear-gradient(135deg, rgba(255,255,255,0.9), rgba(255,255,255,0.6))',
+                  border: '2px solid #f59e0b',
+                  boxShadow: '0 8px 24px rgba(0,0,0,0.08)'
+                }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '1rem' }}>
+                    <span style={{ fontSize: '1.5rem' }}>👷</span>
+                    <span style={{ fontSize: '0.95rem', fontWeight: 600, color: '#c2410c' }}>출근 인원</span>
+                  </div>
+                  <div style={{ fontSize: '2.5rem', fontWeight: 900, color: '#9a3412' }}>
+                    {result.workerCount}명
+                  </div>
+                </div>
+              </div>
+
+              {/* 작업자 목록 */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+                {result.workers.map(([worker, data]: any, index: number) => {
+                  const trip2Ratio = data.total > 0 ? ((data.trip2 / data.total) * 100).toFixed(1) : 0;
+                  const rankClass = index === 0 ? 'rank-1' : index === 1 ? 'rank-2' : index === 2 ? 'rank-3' : 'rank-other';
+                  const borderColor = index === 0 ? '#fbbf24' : index === 1 ? '#9ca3af' : index === 2 ? '#f97316' : '#e5e7eb';
+                  const emoji = index === 0 ? '👑' : index === 1 ? '🥈' : index === 2 ? '🥉' : '👤';
+
+                  return (
+                    <div
+                      key={worker}
+                      style={{
+                        borderRadius: '20px',
+                        border: `3px solid ${borderColor}`,
+                        padding: '2rem',
+                        background: 'white',
+                        position: 'relative',
+                        overflow: 'hidden'
+                      }}
+                    >
+                      <div style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        marginBottom: '1.5rem'
+                      }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '1.5rem' }}>
+                          <span style={{ fontSize: '3.5rem' }}>{emoji}</span>
+                          <div style={{ fontSize: '2rem', fontWeight: 800, color: '#1f2937' }}>{worker}</div>
+                        </div>
+                        <div style={{
+                          background: 'linear-gradient(135deg, #f8fafc, #f1f5f9)',
+                          borderRadius: '16px',
+                          padding: '1.2rem 2rem',
+                          border: `2px solid ${data.trip2 > 0 ? '#10b981' : '#3b82f6'}`,
+                          textAlign: 'center',
+                          minWidth: '140px'
+                        }}>
+                          <div style={{
+                            fontSize: '0.8rem',
+                            fontWeight: 700,
+                            marginBottom: '0.5rem',
+                            color: data.trip2 > 0 ? '#059669' : '#2563eb'
+                          }}>
+                            {data.trip2 > 0 ? 'Trip2' : 'Trip1'}
+                          </div>
+                          <div style={{
+                            fontSize: '2.8rem',
+                            fontWeight: 900,
+                            color: data.trip2 > 0 ? '#047857' : '#1e40af'
+                          }}>
+                            {data.trip2 > 0 ? data.trip2.toLocaleString() : data.trip1.toLocaleString()}
+                          </div>
+                          {data.trip2 > 0 && (
+                            <div style={{
+                              fontSize: '0.8rem',
+                              marginTop: '0.5rem',
+                              fontWeight: 600,
+                              color: '#059669'
+                            }}>
+                              비율: {trip2Ratio}%
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                      
+                      <div style={{
+                        display: 'grid',
+                        gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))',
+                        gap: '1rem'
+                      }}>
+                        {data.routes.map(({ route, trip1, trip2 }: any) => (
+                          <div
+                            key={route}
+                            style={{
+                              background: 'linear-gradient(135deg, #f8fafc, #f1f5f9)',
+                              borderRadius: '12px',
+                              padding: '1rem 1.2rem',
+                              border: '2px solid #e5e7eb',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'space-between'
+                            }}
+                          >
+                            <span style={{ fontWeight: 700, color: '#374151' }}>{route}</span>
+                            <span style={{
+                              fontSize: '1.4rem',
+                              fontWeight: 900,
+                              color: trip2 > 0 ? '#059669' : '#2563eb'
+                            }}>
+                              {trip2 > 0 ? trip2 : trip1}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
     </div>
-
-    <script src="app.js"></script>
-</body>
-</html>
+  );
+}
