@@ -226,91 +226,128 @@ export default function SmartTripAnalyzer() {
       }}
     >
       <div style={{ maxWidth: '1400px', margin: '0 auto', position: 'relative', zIndex: 1 }}>
-        {/* 헤더 */}
-        <div
-          style={{
-            backdropFilter: 'blur(20px)',
-            background: 'rgba(255, 255, 255, 0.1)',
-            border: '1px solid rgba(255, 255, 255, 0.2)',
-            boxShadow: '0 8px 32px rgba(0, 0, 0, 0.1)',
-            borderRadius: '20px',
-            padding: isMobile ? '1.2rem' : '2rem',
-            marginBottom: '2rem',
-          }}
-        >
-          <div
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: isMobile ? '1rem' : '1.5rem',
-              flexDirection: isMobile ? 'column' : 'row',
-              textAlign: isMobile ? 'center' : 'left',
-            }}
-          >
-            {/* ✅ 원형 로고(모바일에서 크게) */}
-            <div
-              style={{
-                width: isMobile ? '150px' : '90px',
-                height: isMobile ? '150px' : '90px',
-                borderRadius: '50%',
-                overflow: 'hidden',
-                boxShadow: '0 10px 50px rgba(102, 126, 234, 0.5)',
-                background: 'white',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                border: '4px solid rgba(255, 255, 255, 0.6)',
-                position: 'relative',
-                flexShrink: 0,
-              }}
-            >
-              <img
-                src="/idol-logo.png"
-                alt="Profile"
-                style={{
-                  width: '100%',
-                  height: '100%',
-                  objectFit: 'cover',
-                }}
-                onError={(e) => {
-                  const target = e.target as HTMLImageElement;
-                  const parent = target.parentElement;
-                  if (parent) {
-                    parent.style.background = 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)';
-                    parent.innerHTML = '<div style="font-size: 3rem;">📦</div>';
-                  }
-                }}
-              />
-            </div>
+{/* 헤더 */}
+<div style={{
+  backdropFilter: 'blur(20px)',
+  background: 'rgba(255, 255, 255, 0.1)',
+  border: '1px solid rgba(255, 255, 255, 0.2)',
+  boxShadow: '0 8px 32px rgba(0, 0, 0, 0.1)',
+  borderRadius: '20px',
+  padding: '2rem',
+  marginBottom: '2rem'
+}}>
+  {/* 모바일 로고 크게/텍스트 최소화를 위한 인라인 CSS */}
+  <style>{`
+    .headerWrap {
+      display: flex;
+      align-items: center;
+      gap: 1.5rem;
+    }
+    .logoCircle {
+      width: 90px;
+      height: 90px;
+      border-radius: 50%;
+      overflow: hidden;
+      box-shadow: 0 10px 50px rgba(102, 126, 234, 0.5);
+      background: white;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border: 4px solid rgba(255, 255, 255, 0.5);
+      position: relative;
+      flex: 0 0 auto;
+    }
+    .logoImg {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+    .titleBig { 
+      font-size: 2.5rem; 
+      font-weight: 900; 
+      color: white; 
+      margin: 0; 
+      letter-spacing: -1px; 
+      line-height: 1.05;
+    }
+    .subText { 
+      font-size: 1rem; 
+      color: rgba(255, 255, 255, 0.9); 
+      margin-top: 0.5rem; 
+      font-weight: 500; 
+    }
 
-            <div>
-              {/* ✅ 모바일에서 타이틀/서브텍스트 조금 줄임 */}
-              <h1
-                style={{
-                  fontSize: isMobile ? '1.9rem' : '2.5rem',
-                  fontWeight: 900,
-                  color: 'white',
-                  margin: 0,
-                  letterSpacing: '-1px',
-                  lineHeight: 1.1,
-                }}
-              >
-                SmartTrip 물량 분석기
-              </h1>
-              <p
-                style={{
-                  fontSize: isMobile ? '0.85rem' : '1rem',
-                  color: 'rgba(255, 255, 255, 0.9)',
-                  marginTop: '0.4rem',
-                  fontWeight: 500,
-                  lineHeight: 1.2,
-                }}
-              >
-                프리미엄 물량 데이터 분석 시스템
-              </p>
-            </div>
-          </div>
-        </div>
+    /* ✅ 모바일: 로고가 화면을 꽉 차게 크게 + 텍스트는 "물량 분석기"만 */
+    @media (max-width: 480px) {
+      .headerWrap {
+        flex-direction: column;
+        align-items: center;
+        text-align: center;
+        gap: 1rem;
+      }
+
+      /* 로고를 크게: 화면 너비에 맞춰 최대한 확장 */
+      .logoCircle {
+        width: min(72vw, 260px);
+        height: min(72vw, 260px);
+        border-radius: 9999px;
+        border-width: 6px;
+      }
+
+      /* "SmartTrip" 크게 필요없으면 숨김 */
+      .titleBig {
+        display: none;
+      }
+
+      /* 부제는 숨김 */
+      .subText {
+        display: none;
+      }
+
+      /* 대신 "물량 분석기"만 보여주기 */
+      .titleMobileOnly {
+        display: block;
+        font-size: 1.8rem;
+        font-weight: 900;
+        color: white;
+        margin: 0;
+        letter-spacing: -0.5px;
+      }
+    }
+
+    /* 데스크탑/태블릿에서는 모바일 전용 텍스트 숨김 */
+    .titleMobileOnly { display: none; }
+  `}</style>
+
+  <div className="headerWrap">
+    {/* 원형 아이돌 이미지 로고 */}
+    <div className="logoCircle">
+      <img
+        src="/idol-logo.png"
+        alt="Profile"
+        className="logoImg"
+        onError={(e) => {
+          const target = e.target as HTMLImageElement;
+          const parent = target.parentElement;
+          if (parent) {
+            parent.style.background = 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)';
+            parent.innerHTML = '<div style="font-size: 3rem;">📦</div>';
+          }
+        }}
+      />
+    </div>
+
+    <div>
+      {/* 데스크탑: 기존 제목 */}
+      <h1 className="titleBig">SmartTrip 물량 분석기</h1>
+      <p className="subText">프리미엄 물량 데이터 분석 시스템</p>
+
+      {/* 모바일: 텍스트 최소 */}
+      <h2 className="titleMobileOnly">물량 분석기</h2>
+    </div>
+  </div>
+</div>
+
 
         {/* 입력 카드들 */}
         <div
