@@ -663,16 +663,128 @@ export default function SmartTripAnalyzer() {
             </div>
 
             <div style={{ padding: '2.5rem' }}>
-              <div
-                style={{
-                  display: 'grid',
-                  gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
-                  gap: '1.5rem',
-                  marginBottom: '2.5rem',
-                }}
-              >
-                {/* 통계 카드들... */}
-              </div>
+<div style={{ padding: '2.5rem' }}>
+  {/* 요약 통계 */}
+  <div
+    style={{
+      display: 'grid',
+      gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
+      gap: '1.5rem',
+      marginBottom: '2rem'
+    }}
+  >
+    <div style={{
+      background: 'white',
+      borderRadius: '18px',
+      padding: '1.2rem',
+      boxShadow: '0 8px 20px rgba(0,0,0,0.08)'
+    }}>
+      <div style={{ fontSize: '0.9rem', color: '#64748b', fontWeight: 700 }}>총 인원</div>
+      <div style={{ fontSize: '2rem', fontWeight: 900, color: '#0f172a', marginTop: '0.25rem' }}>
+        {result.workerCount}명
+      </div>
+    </div>
+
+    <div style={{
+      background: 'white',
+      borderRadius: '18px',
+      padding: '1.2rem',
+      boxShadow: '0 8px 20px rgba(0,0,0,0.08)'
+    }}>
+      <div style={{ fontSize: '0.9rem', color: '#64748b', fontWeight: 700 }}>Trip1 총 수량</div>
+      <div style={{ fontSize: '2rem', fontWeight: 900, color: '#0f172a', marginTop: '0.25rem' }}>
+        {result.trip1Total.toLocaleString()}
+      </div>
+    </div>
+
+    <div style={{
+      background: 'white',
+      borderRadius: '18px',
+      padding: '1.2rem',
+      boxShadow: '0 8px 20px rgba(0,0,0,0.08)'
+    }}>
+      <div style={{ fontSize: '0.9rem', color: '#64748b', fontWeight: 700 }}>Trip2 총 수량</div>
+      <div style={{ fontSize: '2rem', fontWeight: 900, color: '#0f172a', marginTop: '0.25rem' }}>
+        {result.trip2Total.toLocaleString()}
+      </div>
+    </div>
+
+    <div style={{
+      background: 'white',
+      borderRadius: '18px',
+      padding: '1.2rem',
+      boxShadow: '0 8px 20px rgba(0,0,0,0.08)'
+    }}>
+      <div style={{ fontSize: '0.9rem', color: '#64748b', fontWeight: 700 }}>금일 총 수량</div>
+      <div style={{ fontSize: '2rem', fontWeight: 900, color: '#0f172a', marginTop: '0.25rem' }}>
+        {result.totalVolume.toLocaleString()}
+      </div>
+    </div>
+  </div>
+
+  {/* 작업자 리스트 */}
+  <div style={{ display: 'grid', gap: '1rem' }}>
+    {result.workers.map(([worker, data]: any, index: number) => {
+      const medal = index === 0 ? '👑' : index === 1 ? '🥈' : index === 2 ? '🥉' : '👤';
+      const hasTrip2 = result.trip2Total > 0;
+      const mainVol = hasTrip2 ? data.trip2 : data.trip1;
+
+      return (
+        <div
+          key={worker}
+          style={{
+            background: 'white',
+            borderRadius: '18px',
+            padding: '1.2rem',
+            boxShadow: '0 10px 25px rgba(0,0,0,0.08)',
+            border: '1px solid rgba(15, 23, 42, 0.06)'
+          }}
+        >
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: '1rem' }}>
+            <div style={{ fontSize: '1.15rem', fontWeight: 900, color: '#0f172a' }}>
+              {medal} {worker}
+            </div>
+            <div style={{ fontSize: '1.2rem', fontWeight: 900, color: '#111827' }}>
+              {mainVol.toLocaleString()}
+            </div>
+          </div>
+
+          {result.trip2Total > 0 && (
+            <div style={{ marginTop: '0.3rem', fontSize: '0.9rem', color: '#64748b', fontWeight: 700 }}>
+              금일 총합계: {data.total.toLocaleString()}
+            </div>
+          )}
+
+          <div style={{ marginTop: '0.8rem', display: 'grid', gap: '0.35rem' }}>
+            {data.routes
+              .map((r: any) => {
+                const vol = hasTrip2 ? r.trip2 : r.trip1;
+                return { ...r, vol };
+              })
+              .filter((r: any) => r.vol > 0)
+              .sort((a: any, b: any) => b.vol - a.vol)
+              .map((r: any) => (
+                <div
+                  key={r.route}
+                  style={{
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    padding: '0.55rem 0.75rem',
+                    borderRadius: '12px',
+                    background: 'rgba(15, 23, 42, 0.04)',
+                    fontFamily: "'Courier New', monospace"
+                  }}
+                >
+                  <span style={{ fontWeight: 800, color: '#0f172a' }}>{r.route}</span>
+                  <span style={{ fontWeight: 900, color: '#111827' }}>{r.vol.toLocaleString()}</span>
+                </div>
+              ))}
+          </div>
+        </div>
+      );
+    })}
+  </div>
+</div>
             </div>
           </div>
         )}
