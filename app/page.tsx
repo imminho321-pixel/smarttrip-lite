@@ -3,7 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>SmartTrip 물량 분석기 Pro</title>
+    <title>SmartTrip 물량 분석기</title>
+    <meta name="description" content="프리미엄 물량 데이터 분석 시스템">
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700;900&display=swap');
 
@@ -21,7 +22,6 @@
             overflow-x: hidden;
         }
 
-        /* 배경 애니메이션 */
         body::before {
             content: '';
             position: fixed;
@@ -50,7 +50,6 @@
             z-index: 1;
         }
 
-        /* 글래스모피즘 헤더 */
         .header {
             backdrop-filter: blur(20px);
             background: rgba(255, 255, 255, 0.1);
@@ -114,7 +113,6 @@
             font-weight: 500;
         }
 
-        /* 입력 카드 그리드 */
         .input-grid {
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
@@ -171,7 +169,6 @@
             left: 0;
             right: 0;
             bottom: 0;
-            background: linear-gradient(135deg, rgba(255,255,255,0.2), rgba(255,255,255,0.05));
             z-index: 0;
         }
 
@@ -267,7 +264,6 @@
             font-weight: 500;
         }
 
-        /* 버튼 */
         .button-container {
             display: flex;
             justify-content: center;
@@ -334,16 +330,11 @@
                 inset 0 0 0 1px rgba(255, 255, 255, 0.3);
         }
 
-        .btn-analyze:active {
-            transform: translateY(-2px) scale(1.02);
-        }
-
         .btn-text {
             position: relative;
             z-index: 1;
         }
 
-        /* 결과 영역 */
         .result-container {
             backdrop-filter: blur(20px);
             background: rgba(255, 255, 255, 0.95);
@@ -398,19 +389,12 @@
 
         .result-icon {
             font-size: 3.5rem;
-            animation: rotate 3s linear infinite;
-        }
-
-        @keyframes rotate {
-            from { transform: rotate(0deg); }
-            to { transform: rotate(360deg); }
         }
 
         .result-title h2 {
             color: white;
             font-size: 2rem;
             font-weight: 800;
-            text-shadow: 0 2px 20px rgba(0, 0, 0, 0.3);
         }
 
         .result-title p {
@@ -447,7 +431,6 @@
             padding: 2.5rem;
         }
 
-        /* 통계 카드 */
         .stats-grid {
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
@@ -462,24 +445,6 @@
             border: 2px solid;
             box-shadow: 0 8px 24px rgba(0,0,0,0.08);
             transition: all 0.3s ease;
-            position: relative;
-            overflow: hidden;
-        }
-
-        .stat-card::before {
-            content: '';
-            position: absolute;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            background: linear-gradient(135deg, transparent, rgba(255,255,255,0.5));
-            opacity: 0;
-            transition: opacity 0.3s;
-        }
-
-        .stat-card:hover::before {
-            opacity: 1;
         }
 
         .stat-card:hover {
@@ -501,18 +466,11 @@
             font-weight: 600;
         }
 
-        .stat-icon {
-            font-size: 2rem;
-            filter: drop-shadow(0 2px 4px rgba(0,0,0,0.1));
-        }
-
         .stat-value {
             font-size: 2.5rem;
             font-weight: 900;
-            letter-spacing: -1px;
         }
 
-        /* 작업자 카드 */
         .workers-list {
             display: flex;
             flex-direction: column;
@@ -560,7 +518,6 @@
             border-color: #e5e7eb;
             box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
         }
-        .worker-card.rank-other::before { background: linear-gradient(to right, #e5e7eb, #d1d5db); }
 
         .worker-card:hover {
             transform: translateX(8px);
@@ -582,14 +539,12 @@
 
         .worker-emoji {
             font-size: 3.5rem;
-            filter: drop-shadow(0 4px 8px rgba(0,0,0,0.15));
         }
 
         .worker-name {
             font-size: 2rem;
             font-weight: 800;
             color: #1f2937;
-            letter-spacing: -0.5px;
         }
 
         .worker-volume {
@@ -609,14 +564,11 @@
             font-size: 0.8rem;
             font-weight: 700;
             margin-bottom: 0.5rem;
-            text-transform: uppercase;
-            letter-spacing: 1px;
         }
 
         .volume-value {
             font-size: 2.8rem;
             font-weight: 900;
-            letter-spacing: -1px;
         }
 
         .volume-ratio {
@@ -625,12 +577,10 @@
             font-weight: 600;
         }
 
-        /* 라우트 그리드 */
         .routes-grid {
             display: grid;
             grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
             gap: 1rem;
-            margin-top: 0.5rem;
         }
 
         .route-item {
@@ -648,13 +598,11 @@
         .route-item:hover {
             transform: translateY(-4px);
             box-shadow: 0 8px 20px rgba(0,0,0,0.1);
-            border-color: #3b82f6;
         }
 
         .route-name {
             font-weight: 700;
             color: #374151;
-            font-size: 0.95rem;
         }
 
         .route-volume {
@@ -669,7 +617,6 @@
             display: none;
         }
 
-        /* 반응형 */
         @media (max-width: 768px) {
             .header-text h1 { font-size: 1.8rem; }
             .input-grid { grid-template-columns: 1fr; }
@@ -764,294 +711,6 @@ B&M로지스
         <div id="resultContainer" class="hidden"></div>
     </div>
 
-    <script>
-        let state = { trip1Data: '', trip2Data: '', scheduleData: '', targetDate: '', result: null };
-
-        function extractDate(text) {
-            if (!text || typeof text !== 'string') return null;
-            const dotMatch = text.match(/(\d{2,4})\.(\d{1,2})\.(\d{1,2})/);
-            if (dotMatch) {
-                let year = dotMatch[1];
-                const month = dotMatch[2].padStart(2, '0');
-                const day = dotMatch[3].padStart(2, '0');
-                if (year.length === 2) year = '20' + year;
-                return year + '-' + month + '-' + day;
-            }
-            const koreanMatch = text.match(/(\d{1,2})월\s*(\d{1,2})일/);
-            if (koreanMatch) {
-                const month = koreanMatch[1].padStart(2, '0');
-                const day = koreanMatch[2].padStart(2, '0');
-                const now = new Date();
-                let targetYear = now.getFullYear();
-                const currentMonth = now.getMonth() + 1;
-                const inputMonth = parseInt(koreanMatch[1]);
-                if (currentMonth === 12 && inputMonth <= 3) targetYear++;
-                else if (currentMonth <= 3 && inputMonth >= 10) targetYear--;
-                return targetYear + '-' + month + '-' + day;
-            }
-            return null;
-        }
-
-        function parseVolumeData(text) {
-            const lines = text.trim().split('\n');
-            const volumes = {};
-            lines.forEach(line => {
-                const parts = line.split('|').map(s => s.trim());
-                if (parts.length >= 2 && parts[0] && !parts[0].includes('B&M') && !parts[0].includes('캠도물량')) {
-                    volumes[parts[0]] = parseInt(parts[1]) || 0;
-                }
-            });
-            return volumes;
-        }
-
-        function parseScheduleData(text) {
-            const lines = text.trim().split('\n');
-            const schedule = {};
-            lines.forEach(line => {
-                const parts = line.split('/').map(s => s.trim());
-                if (parts.length >= 2) {
-                    if (!schedule[parts[1]]) schedule[parts[1]] = [];
-                    schedule[parts[1]].push(parts[0]);
-                }
-            });
-            return schedule;
-        }
-
-        function expandRoutes(route, trip1Volumes, trip2Volumes) {
-            if (trip1Volumes[route] || trip2Volumes[route]) return [route];
-            const pattern = new RegExp("^" + route + "\\d+$");
-            const subRoutes = new Set();
-            Object.keys(trip1Volumes).forEach(key => { if (pattern.test(key)) subRoutes.add(key); });
-            Object.keys(trip2Volumes).forEach(key => { if (pattern.test(key)) subRoutes.add(key); });
-            return subRoutes.size > 0 ? Array.from(subRoutes).sort() : [route];
-        }
-
-        function analyze() {
-            state.scheduleData = document.getElementById('scheduleInput').value;
-            state.trip1Data = document.getElementById('trip1Input').value;
-            state.trip2Data = document.getElementById('trip2Input').value;
-
-            if (!state.trip1Data || !state.scheduleData) {
-                alert('⚠️ Trip1 물량과 스케줄을 모두 입력해주세요.');
-                return;
-            }
-
-            const trip1Date = extractDate(state.trip1Data);
-            const trip2Date = state.trip2Data ? extractDate(state.trip2Data) : null;
-            const scheduleDate = extractDate(state.scheduleData);
-
-            if (!trip1Date || !scheduleDate) {
-                alert('⚠️ 날짜를 찾을 수 없습니다.');
-                return;
-            }
-
-            if (trip1Date !== scheduleDate || (trip2Date && trip2Date !== scheduleDate)) {
-                alert('❌ 날짜가 일치하지 않습니다!');
-                return;
-            }
-
-            state.targetDate = scheduleDate;
-            const trip1Volumes = parseVolumeData(state.trip1Data);
-            const trip2Volumes = state.trip2Data ? parseVolumeData(state.trip2Data) : {};
-            const schedule = parseScheduleData(state.scheduleData);
-
-            const workerVolumes = {};
-            Object.entries(schedule).forEach(([worker, routes]) => {
-                let trip1Total = 0, trip2Total = 0;
-                const routeDetails = [];
-                routes.forEach(route => {
-                    expandRoutes(route, trip1Volumes, trip2Volumes).forEach(expandedRoute => {
-                        const t1Vol = trip1Volumes[expandedRoute] || 0;
-                        const t2Vol = trip2Volumes[expandedRoute] || 0;
-                        trip1Total += t1Vol;
-                        trip2Total += t2Vol;
-                        if (t1Vol > 0 || t2Vol > 0) {
-                            routeDetails.push({ route: expandedRoute, trip1: t1Vol, trip2: t2Vol, total: t1Vol + t2Vol });
-                        }
-                    });
-                });
-                workerVolumes[worker] = { trip1: trip1Total, trip2: trip2Total, total: trip1Total + trip2Total, routes: routeDetails };
-            });
-
-            const sorted = Object.entries(workerVolumes).sort((a, b) => b[1].total - a[1].total);
-            const totalTrip1 = Object.values(trip1Volumes).reduce((a, b) => a + b, 0);
-            const totalTrip2 = Object.values(trip2Volumes).reduce((a, b) => a + b, 0);
-
-            state.result = {
-                workers: sorted,
-                trip1Total: totalTrip1,
-                trip2Total: totalTrip2,
-                totalVolume: totalTrip1 + totalTrip2,
-                workerCount: sorted.length
-            };
-
-            renderResult();
-        }
-
-        function renderResult() {
-            const container = document.getElementById('resultContainer');
-            if (!state.result) {
-                container.classList.add('hidden');
-                return;
-            }
-
-            container.classList.remove('hidden');
-            const dateStr = new Date(state.targetDate).toLocaleDateString('ko-KR', {
-                year: 'numeric', month: 'long', day: 'numeric', weekday: 'long'
-            });
-
-            let html = `
-                <div class="result-container">
-                    <div class="result-header">
-                        <div class="result-title">
-                            <span class="result-icon">📈</span>
-                            <div>
-                                <h2>분석 결과</h2>
-                                <p>${dateStr}</p>
-                            </div>
-                        </div>
-                        <button class="btn-copy" onclick="copyToClipboard()">
-                            <span style="font-size: 1.5rem;">📋</span>
-                            <span>복사하기</span>
-                        </button>
-                    </div>
-                    <div class="result-body">
-                        <div class="stats-grid">
-                            <div class="stat-card blue">
-                                <div class="stat-label">
-                                    <span class="stat-icon">🚚</span>
-                                    <span style="color: #1e40af;">Trip1 물량</span>
-                                </div>
-                                <div class="stat-value" style="color: #1e3a8a;">${state.result.trip1Total.toLocaleString()}</div>
-                            </div>
-                            <div class="stat-card green">
-                                <div class="stat-label">
-                                    <span class="stat-icon">🚛</span>
-                                    <span style="color: #065f46;">Trip2 물량</span>
-                                </div>
-                                <div class="stat-value" style="color: #064e3b;">${state.result.trip2Total.toLocaleString()}</div>
-                            </div>
-                            <div class="stat-card purple">
-                                <div class="stat-label">
-                                    <span class="stat-icon">📦</span>
-                                    <span style="color: #6b21a8;">총 물량</span>
-                                </div>
-                                <div class="stat-value" style="color: #581c87;">${state.result.totalVolume.toLocaleString()}</div>
-                            </div>
-                            <div class="stat-card orange">
-                                <div class="stat-label">
-                                    <span class="stat-icon">👷</span>
-                                    <span style="color: #c2410c;">출근 인원</span>
-                                </div>
-                                <div class="stat-value" style="color: #9a3412;">${state.result.workerCount}명</div>
-                            </div>
-                        </div>
-                        <div class="workers-list">
-            `;
-
-            state.result.workers.forEach(([worker, data], index) => {
-                const rankClass = index === 0 ? 'rank-1' : index === 1 ? 'rank-2' : index === 2 ? 'rank-3' : 'rank-other';
-                const emoji = index === 0 ? '👑' : index === 1 ? '🥈' : index === 2 ? '🥉' : '👤';
-                const trip2Ratio = data.total > 0 ? ((data.trip2 / data.total) * 100).toFixed(1) : 0;
-
-                html += `
-                    <div class="worker-card ${rankClass}">
-                        <div class="worker-header">
-                            <div class="worker-info">
-                                <div class="worker-emoji">${emoji}</div>
-                                <div class="worker-name">${worker}</div>
-                            </div>
-                            <div class="worker-volume ${data.trip2 > 0 ? 'trip2' : 'trip1'}">
-                                <div class="volume-label" style="color: ${data.trip2 > 0 ? '#059669' : '#2563eb'};">
-                                    ${data.trip2 > 0 ? 'Trip2' : 'Trip1'}
-                                </div>
-                                <div class="volume-value" style="color: ${data.trip2 > 0 ? '#047857' : '#1e40af'};">
-                                    ${data.trip2 > 0 ? data.trip2.toLocaleString() : data.trip1.toLocaleString()}
-                                </div>
-                                ${data.trip2 > 0 ? `<div class="volume-ratio" style="color: #059669;">비율: ${trip2Ratio}%</div>` : ''}
-                            </div>
-                        </div>
-                        <div class="routes-grid">
-                `;
-
-                data.routes.forEach(({ route, trip1, trip2 }) => {
-                    html += `
-                        <div class="route-item">
-                            <span class="route-name">${route}</span>
-                            <span class="route-volume ${trip2 > 0 ? 'trip2' : 'trip1'}">
-                                ${trip2 > 0 ? trip2 : trip1}
-                            </span>
-                        </div>
-                    `;
-                });
-
-                html += `
-                        </div>
-                    </div>
-                `;
-            });
-
-            html += `
-                        </div>
-                    </div>
-                </div>
-            `;
-
-            container.innerHTML = html;
-            container.scrollIntoView({ behavior: 'smooth', block: 'start' });
-        }
-
-        function copyToClipboard() {
-            if (!state.result || !state.targetDate) return;
-
-            const dateObj = new Date(state.targetDate);
-            const year = dateObj.getFullYear();
-            const month = dateObj.getMonth() + 1;
-            const day = dateObj.getDate();
-            const weekdays = ['일', '월', '화', '수', '목', '금', '토'];
-            const weekday = weekdays[dateObj.getDay()];
-            const hasTrip2 = state.result.trip2Total > 0;
-            const tripLabel = hasTrip2 ? "Trip2" : "Trip1";
-            const displayTotal = hasTrip2 ? state.result.trip2Total : state.result.trip1Total;
-
-            let text = "(주)비앤엠(M_안성1)\n";
-            text += year + "년 " + month + "월 " + day + "일(" + weekday + ") " + tripLabel + "\n";
-
-            if (hasTrip2) {
-                const totalRatio = ((state.result.trip2Total / state.result.totalVolume) * 100).toFixed(2);
-                text += "📦 총 수량: " + displayTotal.toLocaleString() + " (비율 " + totalRatio + "%)\n";
-                text += "📊 금일 총 수량: " + state.result.totalVolume.toLocaleString() + " (Trip1 + Trip2)\n\n";
-            } else {
-                text += "📦 총 수량: " + displayTotal.toLocaleString() + "\n\n";
-            }
-
-            state.result.workers.forEach(([worker, data], index) => {
-                const emoji = index === 0 ? '👑' : index === 1 ? '🥈' : index === 2 ? '🥉' : '👤';
-                const trip2Ratio = hasTrip2 && data.total > 0 ? ((data.trip2 / data.total) * 100).toFixed(2) : '0.00';
-                const displayVolume = hasTrip2 ? data.trip2 : data.trip1;
-                const ratioText = hasTrip2 ? " (비율: " + trip2Ratio + "%)" : "";
-
-                text += emoji + " " + worker + " (합계: " + displayVolume + ")" + ratioText + "\n";
-
-                data.routes.forEach(({ route, trip1, trip2 }) => {
-                    const routeVolume = hasTrip2 ? trip2 : trip1;
-                    if (routeVolume > 0) {
-                        text += "  ∙ " + route + " (" + routeVolume + ")\n";
-                    }
-                });
-
-                if (hasTrip2) {
-                    text += "[금일 총합계: " + data.total + "]\n";
-                }
-                text += "\n";
-            });
-
-            navigator.clipboard.writeText(text).then(() => {
-                alert('✅ 복사 완료!');
-            }).catch(() => {
-                alert('❌ 복사 실패');
-            });
-        }
-    </script>
+    <script src="app.js"></script>
 </body>
 </html>
