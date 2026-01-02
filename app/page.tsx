@@ -9,9 +9,15 @@ export default function SmartTripAnalyzer() {
   const [targetDate, setTargetDate] = useState('');
   const [result, setResult] = useState<any>(null);
 
+  // ✅ 반응형(모바일) 판단
+  const isMobile =
+    typeof window !== 'undefined' &&
+    window.matchMedia &&
+    window.matchMedia('(max-width: 768px)').matches;
+
   const extractDate = (text: string) => {
     if (!text || typeof text !== 'string') return null;
-    
+
     const dotMatch = text.match(/(\d{2,4})\.(\d{1,2})\.(\d{1,2})/);
     if (dotMatch) {
       let year = dotMatch[1];
@@ -20,7 +26,7 @@ export default function SmartTripAnalyzer() {
       if (year.length === 2) year = '20' + year;
       return year + '-' + month + '-' + day;
     }
-    
+
     const koreanMatch = text.match(/(\d{1,2})월\s*(\d{1,2})일/);
     if (koreanMatch) {
       const month = koreanMatch[1].padStart(2, '0');
@@ -33,16 +39,21 @@ export default function SmartTripAnalyzer() {
       else if (currentMonth <= 3 && inputMonth >= 10) targetYear--;
       return targetYear + '-' + month + '-' + day;
     }
-    
+
     return null;
   };
 
   const parseVolumeData = (text: string) => {
     const lines = text.trim().split('\n');
     const volumes: Record<string, number> = {};
-    lines.forEach(line => {
-      const parts = line.split('|').map(s => s.trim());
-      if (parts.length >= 2 && parts[0] && !parts[0].includes('B&M') && !parts[0].includes('캠도물량')) {
+    lines.forEach((line) => {
+      const parts = line.split('|').map((s) => s.trim());
+      if (
+        parts.length >= 2 &&
+        parts[0] &&
+        !parts[0].includes('B&M') &&
+        !parts[0].includes('캠도물량')
+      ) {
         volumes[parts[0]] = parseInt(parts[1]) || 0;
       }
     });
@@ -52,8 +63,8 @@ export default function SmartTripAnalyzer() {
   const parseScheduleData = (text: string) => {
     const lines = text.trim().split('\n');
     const schedule: Record<string, string[]> = {};
-    lines.forEach(line => {
-      const parts = line.split('/').map(s => s.trim());
+    lines.forEach((line) => {
+      const parts = line.split('/').map((s) => s.trim());
       if (parts.length >= 2) {
         if (!schedule[parts[1]]) schedule[parts[1]] = [];
         schedule[parts[1]].push(parts[0]);
@@ -62,12 +73,20 @@ export default function SmartTripAnalyzer() {
     return schedule;
   };
 
-  const expandRoutes = (route: string, trip1Volumes: Record<string, number>, trip2Volumes: Record<string, number>) => {
+  const expandRoutes = (
+    route: string,
+    trip1Volumes: Record<string, number>,
+    trip2Volumes: Record<string, number>
+  ) => {
     if (trip1Volumes[route] || trip2Volumes[route]) return [route];
-    const pattern = new RegExp("^" + route + "\\d+$");
+    const pattern = new RegExp('^' + route + '\\d+$');
     const subRoutes = new Set<string>();
-    Object.keys(trip1Volumes).forEach(key => { if (pattern.test(key)) subRoutes.add(key); });
-    Object.keys(trip2Volumes).forEach(key => { if (pattern.test(key)) subRoutes.add(key); });
+    Object.keys(trip1Volumes).forEach((key) => {
+      if (pattern.test(key)) subRoutes.add(key);
+    });
+    Object.keys(trip2Volumes).forEach((key) => {
+      if (pattern.test(key)) subRoutes.add(key);
+    });
     return subRoutes.size > 0 ? Array.from(subRoutes).sort() : [route];
   };
 
@@ -98,23 +117,36 @@ export default function SmartTripAnalyzer() {
 
     const workerVolumes: any = {};
     Object.entries(schedule).forEach(([worker, routes]) => {
-      let trip1Total = 0, trip2Total = 0;
+      let trip1Total = 0,
+        trip2Total = 0;
       const routeDetails: any[] = [];
-      routes.forEach(route => {
-        expandRoutes(route, trip1Volumes, trip2Volumes).forEach(expandedRoute => {
+      routes.forEach((route) => {
+        expandRoutes(route, trip1Volumes, trip2Volumes).forEach((expandedRoute) => {
           const t1Vol = trip1Volumes[expandedRoute] || 0;
           const t2Vol = trip2Volumes[expandedRoute] || 0;
           trip1Total += t1Vol;
           trip2Total += t2Vol;
           if (t1Vol > 0 || t2Vol > 0) {
-            routeDetails.push({ route: expandedRoute, trip1: t1Vol, trip2: t2Vol, total: t1Vol + t2Vol });
+            routeDetails.push({
+              route: expandedRoute,
+              trip1: t1Vol,
+              trip2: t2Vol,
+              total: t1Vol + t2Vol,
+            });
           }
         });
       });
-      workerVolumes[worker] = { trip1: trip1Total, trip2: trip2Total, total: trip1Total + trip2Total, routes: routeDetails };
+      workerVolumes[worker] = {
+        trip1: trip1Total,
+        trip2: trip2Total,
+        total: trip1Total + trip2Total,
+        routes: routeDetails,
+      };
     });
 
-    const sorted = Object.entries(workerVolumes).sort((a: any, b: any) => b[1].total - a[1].total);
+    const sorted = Object.entries(workerVolumes).sort(
+      (a: any, b: any) => b[1].total - a[1].total
+    );
     const totalTrip1 = Object.values(trip1Volumes).reduce((a, b) => a + b, 0);
     const totalTrip2 = Object.values(trip2Volumes).reduce((a, b) => a + b, 0);
 
@@ -123,13 +155,13 @@ export default function SmartTripAnalyzer() {
       trip1Total: totalTrip1,
       trip2Total: totalTrip2,
       totalVolume: totalTrip1 + totalTrip2,
-      workerCount: sorted.length
+      workerCount: sorted.length,
     });
   };
 
   const copyToClipboard = () => {
     if (!result || !targetDate) return;
-    
+
     const dateObj = new Date(targetDate);
     const year = dateObj.getFullYear();
     const month = dateObj.getMonth() + 1;
@@ -137,89 +169,108 @@ export default function SmartTripAnalyzer() {
     const weekdays = ['일', '월', '화', '수', '목', '금', '토'];
     const weekday = weekdays[dateObj.getDay()];
     const hasTrip2 = result.trip2Total > 0;
-    const tripLabel = hasTrip2 ? "Trip2" : "Trip1";
+    const tripLabel = hasTrip2 ? 'Trip2' : 'Trip1';
     const displayTotal = hasTrip2 ? result.trip2Total : result.trip1Total;
 
-    let text = "(주)비앤엠(M_안성1)\n";
-    text += year + "년 " + month + "월 " + day + "일(" + weekday + ") " + tripLabel + "\n";
+    let text = '(주)비앤엠(M_안성1)\n';
+    text += year + '년 ' + month + '월 ' + day + '일(' + weekday + ') ' + tripLabel + '\n';
 
     if (hasTrip2) {
       const totalRatio = ((result.trip2Total / result.totalVolume) * 100).toFixed(2);
-      text += "📦 총 수량: " + displayTotal.toLocaleString() + " (비율 " + totalRatio + "%)\n";
-      text += "📊 금일 총 수량: " + result.totalVolume.toLocaleString() + " (Trip1 + Trip2)\n\n";
+      text += '📦 총 수량: ' + displayTotal.toLocaleString() + ' (비율 ' + totalRatio + '%)\n';
+      text += '📊 금일 총 수량: ' + result.totalVolume.toLocaleString() + ' (Trip1 + Trip2)\n\n';
     } else {
-      text += "📦 총 수량: " + displayTotal.toLocaleString() + "\n\n";
+      text += '📦 총 수량: ' + displayTotal.toLocaleString() + '\n\n';
     }
 
     result.workers.forEach(([worker, data]: any, index: number) => {
       const emoji = index === 0 ? '👑' : index === 1 ? '🥈' : index === 2 ? '🥉' : '👤';
-      const trip2Ratio = hasTrip2 && data.total > 0 ? ((data.trip2 / data.total) * 100).toFixed(2) : '0.00';
+      const trip2Ratio =
+        hasTrip2 && data.total > 0 ? ((data.trip2 / data.total) * 100).toFixed(2) : '0.00';
       const displayVolume = hasTrip2 ? data.trip2 : data.trip1;
-      const ratioText = hasTrip2 ? " (비율: " + trip2Ratio + "%)" : "";
+      const ratioText = hasTrip2 ? ' (비율: ' + trip2Ratio + '%)' : '';
 
-      text += emoji + " " + worker + " (합계: " + displayVolume + ")" + ratioText + "\n";
+      text += emoji + ' ' + worker + ' (합계: ' + displayVolume + ')' + ratioText + '\n';
 
       data.routes.forEach(({ route, trip1, trip2 }: any) => {
         const routeVolume = hasTrip2 ? trip2 : trip1;
         if (routeVolume > 0) {
-          text += "  ∙ " + route + " (" + routeVolume + ")\n";
+          text += '  ∙ ' + route + ' (' + routeVolume + ')\n';
         }
       });
 
       if (hasTrip2) {
-        text += "[금일 총합계: " + data.total + "]\n";
+        text += '[금일 총합계: ' + data.total + ']\n';
       }
-      text += "\n";
+      text += '\n';
     });
 
-    navigator.clipboard.writeText(text).then(() => {
-      alert('✅ 복사 완료!');
-    }).catch(() => {
-      alert('❌ 복사 실패');
-    });
+    navigator.clipboard
+      .writeText(text)
+      .then(() => {
+        alert('✅ 복사 완료!');
+      })
+      .catch(() => {
+        alert('❌ 복사 실패');
+      });
   };
 
   return (
-    <div style={{ 
-      fontFamily: "'Noto Sans KR', -apple-system, BlinkMacSystemFont, sans-serif",
-      background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-      minHeight: '100vh',
-      padding: '2rem',
-      position: 'relative'
-    }}>
+    <div
+      style={{
+        fontFamily: "'Noto Sans KR', -apple-system, BlinkMacSystemFont, sans-serif",
+        background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+        minHeight: '100vh',
+        padding: isMobile ? '1rem' : '2rem',
+        position: 'relative',
+      }}
+    >
       <div style={{ maxWidth: '1400px', margin: '0 auto', position: 'relative', zIndex: 1 }}>
         {/* 헤더 */}
-        <div style={{
-          backdropFilter: 'blur(20px)',
-          background: 'rgba(255, 255, 255, 0.1)',
-          border: '1px solid rgba(255, 255, 255, 0.2)',
-          boxShadow: '0 8px 32px rgba(0, 0, 0, 0.1)',
-          borderRadius: '20px',
-          padding: '2rem',
-          marginBottom: '2rem'
-        }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '1.5rem' }}>
-            {/* 원형 아이돌 이미지 로고 */}
-            <div style={{
-              width: '90px',
-              height: '90px',
-              borderRadius: '50%',
-              overflow: 'hidden',
-              boxShadow: '0 10px 50px rgba(102, 126, 234, 0.5)',
-              background: 'white',
+        <div
+          style={{
+            backdropFilter: 'blur(20px)',
+            background: 'rgba(255, 255, 255, 0.1)',
+            border: '1px solid rgba(255, 255, 255, 0.2)',
+            boxShadow: '0 8px 32px rgba(0, 0, 0, 0.1)',
+            borderRadius: '20px',
+            padding: isMobile ? '1.2rem' : '2rem',
+            marginBottom: '2rem',
+          }}
+        >
+          <div
+            style={{
               display: 'flex',
               alignItems: 'center',
-              justifyContent: 'center',
-              border: '4px solid rgba(255, 255, 255, 0.5)',
-              position: 'relative'
-            }}>
-              <img 
+              gap: isMobile ? '1rem' : '1.5rem',
+              flexDirection: isMobile ? 'column' : 'row',
+              textAlign: isMobile ? 'center' : 'left',
+            }}
+          >
+            {/* ✅ 원형 로고(모바일에서 크게) */}
+            <div
+              style={{
+                width: isMobile ? '150px' : '90px',
+                height: isMobile ? '150px' : '90px',
+                borderRadius: '50%',
+                overflow: 'hidden',
+                boxShadow: '0 10px 50px rgba(102, 126, 234, 0.5)',
+                background: 'white',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                border: '4px solid rgba(255, 255, 255, 0.6)',
+                position: 'relative',
+                flexShrink: 0,
+              }}
+            >
+              <img
                 src="/idol-logo.png"
-                alt="Profile" 
-                style={{ 
-                  width: '100%', 
-                  height: '100%', 
-                  objectFit: 'cover'
+                alt="Profile"
+                style={{
+                  width: '100%',
+                  height: '100%',
+                  objectFit: 'cover',
                 }}
                 onError={(e) => {
                   const target = e.target as HTMLImageElement;
@@ -231,11 +282,30 @@ export default function SmartTripAnalyzer() {
                 }}
               />
             </div>
+
             <div>
-              <h1 style={{ fontSize: '2.5rem', fontWeight: 900, color: 'white', margin: 0, letterSpacing: '-1px' }}>
+              {/* ✅ 모바일에서 타이틀/서브텍스트 조금 줄임 */}
+              <h1
+                style={{
+                  fontSize: isMobile ? '1.9rem' : '2.5rem',
+                  fontWeight: 900,
+                  color: 'white',
+                  margin: 0,
+                  letterSpacing: '-1px',
+                  lineHeight: 1.1,
+                }}
+              >
                 SmartTrip 물량 분석기
               </h1>
-              <p style={{ fontSize: '1rem', color: 'rgba(255, 255, 255, 0.9)', marginTop: '0.5rem', fontWeight: 500 }}>
+              <p
+                style={{
+                  fontSize: isMobile ? '0.85rem' : '1rem',
+                  color: 'rgba(255, 255, 255, 0.9)',
+                  marginTop: '0.4rem',
+                  fontWeight: 500,
+                  lineHeight: 1.2,
+                }}
+              >
                 프리미엄 물량 데이터 분석 시스템
               </p>
             </div>
@@ -243,25 +313,36 @@ export default function SmartTripAnalyzer() {
         </div>
 
         {/* 입력 카드들 */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(350px, 1fr))', gap: '2rem', marginBottom: '3rem' }}>
+        <div
+          style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fit, minmax(350px, 1fr))',
+            gap: '2rem',
+            marginBottom: '3rem',
+          }}
+        >
           {/* 스케줄 입력 */}
-          <div style={{ 
-            backdropFilter: 'blur(20px)',
-            background: 'rgba(255, 255, 255, 0.1)',
-            border: '1px solid rgba(255, 255, 255, 0.2)',
-            borderRadius: '24px',
-            overflow: 'hidden',
-            boxShadow: '0 8px 32px rgba(0, 0, 0, 0.1)',
-            transition: 'all 0.4s'
-          }}>
-            <div style={{ 
-              background: 'linear-gradient(135deg, #a855f7, #ec4899)', 
-              padding: '1.5rem',
-              color: 'white',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '1rem'
-            }}>
+          <div
+            style={{
+              backdropFilter: 'blur(20px)',
+              background: 'rgba(255, 255, 255, 0.1)',
+              border: '1px solid rgba(255, 255, 255, 0.2)',
+              borderRadius: '24px',
+              overflow: 'hidden',
+              boxShadow: '0 8px 32px rgba(0, 0, 0, 0.1)',
+              transition: 'all 0.4s',
+            }}
+          >
+            <div
+              style={{
+                background: 'linear-gradient(135deg, #a855f7, #ec4899)',
+                padding: '1.5rem',
+                color: 'white',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '1rem',
+              }}
+            >
               <span style={{ fontSize: '2rem' }}>👥</span>
               <h2 style={{ fontSize: '1.4rem', fontWeight: 700, margin: 0 }}>당일 스케줄</h2>
             </div>
@@ -281,28 +362,32 @@ export default function SmartTripAnalyzer() {
                   resize: 'none',
                   background: 'rgba(255, 255, 255, 0.9)',
                   color: '#1f2937',
-                  transition: 'all 0.3s'
+                  transition: 'all 0.3s',
                 }}
               />
               <div style={{ marginTop: '1rem', fontSize: '0.875rem' }}>
-                <div style={{ 
-                  padding: '0.75rem', 
-                  borderRadius: '12px', 
-                  background: 'rgba(59, 130, 246, 0.15)', 
-                  color: 'white',
-                  border: '1px solid rgba(59, 130, 246, 0.3)',
-                  marginBottom: '0.5rem'
-                }}>
+                <div
+                  style={{
+                    padding: '0.75rem',
+                    borderRadius: '12px',
+                    background: 'rgba(59, 130, 246, 0.15)',
+                    color: 'white',
+                    border: '1px solid rgba(59, 130, 246, 0.3)',
+                    marginBottom: '0.5rem',
+                  }}
+                >
                   💡 511B, 529A 같은 표기는 전체 하위구역 포함
                 </div>
-                <div style={{ 
-                  padding: '0.75rem', 
-                  borderRadius: '12px', 
-                  background: 'rgba(239, 68, 68, 0.15)', 
-                  color: 'white',
-                  border: '1px solid rgba(239, 68, 68, 0.3)',
-                  fontWeight: 500
-                }}>
+                <div
+                  style={{
+                    padding: '0.75rem',
+                    borderRadius: '12px',
+                    background: 'rgba(239, 68, 68, 0.15)',
+                    color: 'white',
+                    border: '1px solid rgba(239, 68, 68, 0.3)',
+                    fontWeight: 500,
+                  }}
+                >
                   ⚠️ 날짜 필수: "1월 15일" 형식
                 </div>
               </div>
@@ -310,22 +395,26 @@ export default function SmartTripAnalyzer() {
           </div>
 
           {/* Trip1 입력 */}
-          <div style={{ 
-            backdropFilter: 'blur(20px)',
-            background: 'rgba(255, 255, 255, 0.1)',
-            border: '1px solid rgba(255, 255, 255, 0.2)',
-            borderRadius: '24px',
-            overflow: 'hidden',
-            boxShadow: '0 8px 32px rgba(0, 0, 0, 0.1)'
-          }}>
-            <div style={{ 
-              background: 'linear-gradient(135deg, #3b82f6, #06b6d4)', 
-              padding: '1.5rem',
-              color: 'white',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '1rem'
-            }}>
+          <div
+            style={{
+              backdropFilter: 'blur(20px)',
+              background: 'rgba(255, 255, 255, 0.1)',
+              border: '1px solid rgba(255, 255, 255, 0.2)',
+              borderRadius: '24px',
+              overflow: 'hidden',
+              boxShadow: '0 8px 32px rgba(0, 0, 0, 0.1)',
+            }}
+          >
+            <div
+              style={{
+                background: 'linear-gradient(135deg, #3b82f6, #06b6d4)',
+                padding: '1.5rem',
+                color: 'white',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '1rem',
+              }}
+            >
               <span style={{ fontSize: '2rem' }}>📊</span>
               <h2 style={{ fontSize: '1.4rem', fontWeight: 700, margin: 0 }}>Trip1 물량 데이터</h2>
             </div>
@@ -344,18 +433,20 @@ export default function SmartTripAnalyzer() {
                   fontSize: '0.9rem',
                   resize: 'none',
                   background: 'rgba(255, 255, 255, 0.9)',
-                  color: '#1f2937'
+                  color: '#1f2937',
                 }}
               />
               <div style={{ marginTop: '1rem', fontSize: '0.875rem' }}>
-                <div style={{ 
-                  padding: '0.75rem', 
-                  borderRadius: '12px', 
-                  background: 'rgba(239, 68, 68, 0.15)', 
-                  color: 'white',
-                  border: '1px solid rgba(239, 68, 68, 0.3)',
-                  fontWeight: 500
-                }}>
+                <div
+                  style={{
+                    padding: '0.75rem',
+                    borderRadius: '12px',
+                    background: 'rgba(239, 68, 68, 0.15)',
+                    color: 'white',
+                    border: '1px solid rgba(239, 68, 68, 0.3)',
+                    fontWeight: 500,
+                  }}
+                >
                   ⚠️ 날짜 필수: "26.01.15Trip1" 형식
                 </div>
               </div>
@@ -363,22 +454,26 @@ export default function SmartTripAnalyzer() {
           </div>
 
           {/* Trip2 입력 */}
-          <div style={{ 
-            backdropFilter: 'blur(20px)',
-            background: 'rgba(255, 255, 255, 0.1)',
-            border: '1px solid rgba(255, 255, 255, 0.2)',
-            borderRadius: '24px',
-            overflow: 'hidden',
-            boxShadow: '0 8px 32px rgba(0, 0, 0, 0.1)'
-          }}>
-            <div style={{ 
-              background: 'linear-gradient(135deg, #10b981, #34d399)', 
-              padding: '1.5rem',
-              color: 'white',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '1rem'
-            }}>
+          <div
+            style={{
+              backdropFilter: 'blur(20px)',
+              background: 'rgba(255, 255, 255, 0.1)',
+              border: '1px solid rgba(255, 255, 255, 0.2)',
+              borderRadius: '24px',
+              overflow: 'hidden',
+              boxShadow: '0 8px 32px rgba(0, 0, 0, 0.1)',
+            }}
+          >
+            <div
+              style={{
+                background: 'linear-gradient(135deg, #10b981, #34d399)',
+                padding: '1.5rem',
+                color: 'white',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '1rem',
+              }}
+            >
               <span style={{ fontSize: '2rem' }}>📈</span>
               <h2 style={{ fontSize: '1.4rem', fontWeight: 700, margin: 0 }}>Trip2 물량 데이터</h2>
             </div>
@@ -397,28 +492,32 @@ export default function SmartTripAnalyzer() {
                   fontSize: '0.9rem',
                   resize: 'none',
                   background: 'rgba(255, 255, 255, 0.9)',
-                  color: '#1f2937'
+                  color: '#1f2937',
                 }}
               />
               <div style={{ marginTop: '1rem', fontSize: '0.875rem' }}>
-                <div style={{ 
-                  padding: '0.75rem', 
-                  borderRadius: '12px', 
-                  background: 'rgba(59, 130, 246, 0.15)', 
-                  color: 'white',
-                  border: '1px solid rgba(59, 130, 246, 0.3)',
-                  marginBottom: '0.5rem'
-                }}>
+                <div
+                  style={{
+                    padding: '0.75rem',
+                    borderRadius: '12px',
+                    background: 'rgba(59, 130, 246, 0.15)',
+                    color: 'white',
+                    border: '1px solid rgba(59, 130, 246, 0.3)',
+                    marginBottom: '0.5rem',
+                  }}
+                >
                   💡 Trip2가 없으면 비워두세요
                 </div>
-                <div style={{ 
-                  padding: '0.75rem', 
-                  borderRadius: '12px', 
-                  background: 'rgba(239, 68, 68, 0.15)', 
-                  color: 'white',
-                  border: '1px solid rgba(239, 68, 68, 0.3)',
-                  fontWeight: 500
-                }}>
+                <div
+                  style={{
+                    padding: '0.75rem',
+                    borderRadius: '12px',
+                    background: 'rgba(239, 68, 68, 0.15)',
+                    color: 'white',
+                    border: '1px solid rgba(239, 68, 68, 0.3)',
+                    fontWeight: 500,
+                  }}
+                >
                   ⚠️ 날짜 필수: "26.01.15Trip2" 형식
                 </div>
               </div>
@@ -434,16 +533,16 @@ export default function SmartTripAnalyzer() {
               background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
               color: 'white',
               fontWeight: 700,
-              padding: '1.5rem 5rem',
+              padding: isMobile ? '1.2rem 3rem' : '1.5rem 5rem',
               borderRadius: '20px',
               border: 'none',
-              fontSize: '1.3rem',
+              fontSize: isMobile ? '1.1rem' : '1.3rem',
               cursor: 'pointer',
               display: 'flex',
               alignItems: 'center',
               gap: '1rem',
               boxShadow: '0 10px 40px rgba(102, 126, 234, 0.4)',
-              transition: 'all 0.3s'
+              transition: 'all 0.3s',
             }}
             onMouseEnter={(e) => {
               e.currentTarget.style.transform = 'translateY(-4px) scale(1.05)';
@@ -459,32 +558,46 @@ export default function SmartTripAnalyzer() {
 
         {/* 결과 표시 - 나머지 코드 동일 */}
         {result && (
-          <div style={{
-            backdropFilter: 'blur(20px)',
-            background: 'rgba(255, 255, 255, 0.95)',
-            borderRadius: '24px',
-            boxShadow: '0 20px 60px rgba(0, 0, 0, 0.2)',
-            border: '1px solid rgba(255, 255, 255, 0.3)',
-            overflow: 'hidden',
-            marginBottom: '3rem'
-          }}>
-            <div style={{
-              background: 'linear-gradient(135deg, #1e293b 0%, #0f172a 100%)',
-              padding: '2.5rem',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between'
-            }}>
+          <div
+            style={{
+              backdropFilter: 'blur(20px)',
+              background: 'rgba(255, 255, 255, 0.95)',
+              borderRadius: '24px',
+              boxShadow: '0 20px 60px rgba(0, 0, 0, 0.2)',
+              border: '1px solid rgba(255, 255, 255, 0.3)',
+              overflow: 'hidden',
+              marginBottom: '3rem',
+            }}
+          >
+            <div
+              style={{
+                background: 'linear-gradient(135deg, #1e293b 0%, #0f172a 100%)',
+                padding: isMobile ? '1.5rem' : '2.5rem',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                flexDirection: isMobile ? 'column' : 'row',
+                gap: isMobile ? '1rem' : '0',
+              }}
+            >
               <div style={{ display: 'flex', alignItems: 'center', gap: '1.5rem' }}>
                 <span style={{ fontSize: '3.5rem' }}>📈</span>
                 <div>
-                  <h2 style={{ fontSize: '2rem', fontWeight: 800, color: 'white', margin: 0 }}>분석 결과</h2>
-                  <p style={{ fontSize: '1rem', color: 'rgba(255, 255, 255, 0.8)', marginTop: '0.5rem' }}>
+                  <h2 style={{ fontSize: isMobile ? '1.6rem' : '2rem', fontWeight: 800, color: 'white', margin: 0 }}>
+                    분석 결과
+                  </h2>
+                  <p
+                    style={{
+                      fontSize: isMobile ? '0.9rem' : '1rem',
+                      color: 'rgba(255, 255, 255, 0.8)',
+                      marginTop: '0.5rem',
+                    }}
+                  >
                     {new Date(targetDate).toLocaleDateString('ko-KR', {
                       year: 'numeric',
                       month: 'long',
                       day: 'numeric',
-                      weekday: 'long'
+                      weekday: 'long',
                     })}
                   </p>
                 </div>
@@ -499,10 +612,12 @@ export default function SmartTripAnalyzer() {
                   borderRadius: '16px',
                   border: 'none',
                   cursor: 'pointer',
-                  fontSize: '1.1rem',
+                  fontSize: isMobile ? '1rem' : '1.1rem',
                   display: 'flex',
                   alignItems: 'center',
-                  gap: '0.75rem'
+                  gap: '0.75rem',
+                  width: isMobile ? '100%' : 'auto',
+                  justifyContent: 'center',
                 }}
               >
                 <span style={{ fontSize: '1.5rem' }}>📋</span>
@@ -510,14 +625,15 @@ export default function SmartTripAnalyzer() {
               </button>
             </div>
 
-            {/* 통계 및 작업자 목록 - 이전 코드와 동일 */}
             <div style={{ padding: '2.5rem' }}>
-              <div style={{
-                display: 'grid',
-                gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
-                gap: '1.5rem',
-                marginBottom: '2.5rem'
-              }}>
+              <div
+                style={{
+                  display: 'grid',
+                  gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
+                  gap: '1.5rem',
+                  marginBottom: '2.5rem',
+                }}
+              >
                 {/* 통계 카드들... */}
               </div>
             </div>
