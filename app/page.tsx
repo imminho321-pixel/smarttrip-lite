@@ -143,8 +143,17 @@ export default function SmartTripAnalyzer() {
   };
 
   const analyze = () => {
-    if (!trip1Data || !scheduleData) {
-      alert('⚠️ Trip1 물량과 스케줄을 모두 입력해주세요.');
+    // 1) 빈 입력 체크
+    if (!scheduleData.trim() && !trip1Data.trim()) {
+      alert('⚠️ 스케줄과 Trip1 물량을 입력해주세요.');
+      return;
+    }
+    if (!scheduleData.trim()) {
+      alert('⚠️ 당일 스케줄이 비어있습니다.\n스케줄을 입력해주세요.');
+      return;
+    }
+    if (!trip1Data.trim()) {
+      alert('⚠️ Trip1 물량 데이터가 비어있습니다.\nTrip1 물량을 입력해주세요.');
       return;
     }
 
@@ -152,13 +161,27 @@ export default function SmartTripAnalyzer() {
     const trip2Date = trip2Data ? extractDate(trip2Data) : null;
     const scheduleDate = extractDate(scheduleData);
 
-    if (!trip1Date || !scheduleDate) {
-      alert('⚠️ 날짜를 찾을 수 없습니다.');
+    // 2) 날짜 인식 실패 체크 (어느 칸인지 알려줌)
+    if (!scheduleDate && !trip1Date) {
+      alert('⚠️ 날짜를 찾을 수 없습니다.\n\n• 스케줄: "1월 15일" 형식으로 입력했는지\n• Trip1: "26.01.15Trip1" 형식으로 입력했는지\n확인해주세요.');
+      return;
+    }
+    if (!scheduleDate) {
+      alert('⚠️ 스케줄에서 날짜를 찾을 수 없습니다.\n"1월 15일" 같은 형식으로 입력했는지 확인해주세요.');
+      return;
+    }
+    if (!trip1Date) {
+      alert('⚠️ Trip1 물량에서 날짜를 찾을 수 없습니다.\n"26.01.15Trip1" 같은 형식으로 입력했는지 확인해주세요.');
       return;
     }
 
-    if (trip1Date !== scheduleDate || (trip2Date && trip2Date !== scheduleDate)) {
-      alert('❌ 날짜가 일치하지 않습니다!');
+    // 3) 날짜 불일치 체크 (어떤 날짜끼리 안 맞는지 알려줌)
+    if (trip1Date !== scheduleDate) {
+      alert('❌ 날짜가 일치하지 않습니다!\n\n• 스케줄: ' + scheduleDate + '\n• Trip1: ' + trip1Date + '\n\n같은 날짜인지 확인해주세요.');
+      return;
+    }
+    if (trip2Date && trip2Date !== scheduleDate) {
+      alert('❌ Trip2 날짜가 다릅니다!\n\n• 스케줄: ' + scheduleDate + '\n• Trip2: ' + trip2Date + '\n\n같은 날짜인지 확인해주세요.');
       return;
     }
 
@@ -333,7 +356,7 @@ export default function SmartTripAnalyzer() {
         .st-header {
           text-align: center;
           padding: 1.5rem 0 2.5rem;
-          border-bottom: 1px solid rgba(201,162,39,0.18);
+          border-bottom: 2px solid rgba(201,162,39,0.4);
           margin-bottom: 2.5rem;
         }
         .st-logo-ring {
@@ -378,14 +401,14 @@ export default function SmartTripAnalyzer() {
         }
         .st-card {
           background: #141414;
-          border: 1px solid rgba(201,162,39,0.15);
+          border: 2px solid rgba(201,162,39,0.45);
           border-radius: 18px;
           overflow: hidden;
         }
         .st-card-head {
           padding: 1.1rem 1.4rem;
           display: flex; align-items: center; gap: 0.8rem;
-          border-bottom: 1px solid rgba(201,162,39,0.12);
+          border-bottom: 2px solid rgba(201,162,39,0.35);
         }
         .st-card-head .ico { font-size: 1.5rem; }
         .st-card-head h2 {
@@ -408,15 +431,6 @@ export default function SmartTripAnalyzer() {
         }
         .st-textarea:focus { border-color: rgba(201,162,39,0.5); }
         .st-textarea::placeholder { color: #5a5a55; }
-        .st-hint {
-          margin-top: 0.9rem;
-          padding: 0.65rem 0.9rem;
-          border-radius: 10px;
-          font-size: 0.83rem;
-          font-weight: 500;
-        }
-        .st-hint.info { background: rgba(201,162,39,0.08); color: #d8c98f; border: 1px solid rgba(201,162,39,0.2); margin-bottom: 0.5rem; }
-        .st-hint.warn { background: rgba(180,80,40,0.1); color: #d9a98f; border: 1px solid rgba(180,80,40,0.25); }
 
         /* 버튼 영역 */
         .st-actions {
@@ -485,8 +499,8 @@ export default function SmartTripAnalyzer() {
         /* 통계 */
         .st-stats {
           display: grid; grid-template-columns: repeat(3, 1fr);
-          gap: 1px; background: rgba(201,162,39,0.18);
-          border: 1px solid rgba(201,162,39,0.18); border-radius: 14px;
+          gap: 2px; background: rgba(201,162,39,0.4);
+          border: 2px solid rgba(201,162,39,0.45); border-radius: 14px;
           overflow: hidden; margin-bottom: 2.5rem;
         }
         .st-stat { background: #141414; padding: 1.4rem 1rem; text-align: center; }
@@ -589,8 +603,6 @@ export default function SmartTripAnalyzer() {
                 onChange={(e) => setScheduleData(e.target.value)}
                 placeholder={'📅 예시:\n2W 입차일 : 1월 15일 수요일\n출근인원 : 13명\n\n501B01 / 김병후\n501B02 / 김병후\n511B / 임민호\n...'}
               />
-              <div className="st-hint info">💡 511B, 529A 같은 표기는 전체 하위구역 포함</div>
-              <div className="st-hint warn">⚠️ 날짜 필수: &quot;1월 15일&quot; 형식</div>
             </div>
           </div>
 
@@ -607,7 +619,6 @@ export default function SmartTripAnalyzer() {
                 onChange={(e) => setTrip1Data(e.target.value)}
                 placeholder={'📦 예시:\n26.01.15Trip1 캠도물량\nB&M로지스\n501B01 24\n501B02 40\n(공백/탭/| 무엇이든 인식)\n...'}
               />
-              <div className="st-hint warn">⚠️ 날짜 필수: &quot;26.01.15Trip1&quot; 형식</div>
             </div>
           </div>
 
@@ -624,8 +635,6 @@ export default function SmartTripAnalyzer() {
                 onChange={(e) => setTrip2Data(e.target.value)}
                 placeholder={'📦 예시 (선택):\n26.01.15Trip2 캠도물량\nB&M로지스\n501B01 7\n501B02 15\n...'}
               />
-              <div className="st-hint info">💡 Trip2가 없으면 비워두세요</div>
-              <div className="st-hint warn">⚠️ 날짜 필수: &quot;26.01.15Trip2&quot; 형식</div>
             </div>
           </div>
         </div>
