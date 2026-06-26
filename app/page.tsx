@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 
 export default function SmartTripAnalyzer() {
   const [trip1Data, setTrip1Data] = useState('');
@@ -8,12 +8,57 @@ export default function SmartTripAnalyzer() {
   const [scheduleData, setScheduleData] = useState('');
   const [targetDate, setTargetDate] = useState('');
   const [result, setResult] = useState<any>(null);
+  const [loaded, setLoaded] = useState(false);
 
   // ✅ 반응형(모바일) 판단
   const isMobile =
     typeof window !== 'undefined' &&
     window.matchMedia &&
     window.matchMedia('(max-width: 768px)').matches;
+
+  // ✅ [업그레이드] 입력값 자동 불러오기 (페이지 열릴 때 1회)
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem('smarttrip_inputs');
+      if (saved) {
+        const data = JSON.parse(saved);
+        if (data.scheduleData) setScheduleData(data.scheduleData);
+        if (data.trip1Data) setTrip1Data(data.trip1Data);
+        if (data.trip2Data) setTrip2Data(data.trip2Data);
+      }
+    } catch {
+      // 저장된 값 없거나 손상 시 무시
+    }
+    setLoaded(true);
+  }, []);
+
+  // ✅ [업그레이드] 입력값 자동 저장 (입력 바뀔 때마다)
+  useEffect(() => {
+    if (!loaded) return; // 첫 로드 전에는 저장하지 않음
+    try {
+      localStorage.setItem(
+        'smarttrip_inputs',
+        JSON.stringify({ scheduleData, trip1Data, trip2Data })
+      );
+    } catch {
+      // 저장 공간 문제 등 무시
+    }
+  }, [scheduleData, trip1Data, trip2Data, loaded]);
+
+  // ✅ [업그레이드] 입력 초기화
+  const resetInputs = () => {
+    if (!confirm('입력한 내용을 모두 지울까요?')) return;
+    setScheduleData('');
+    setTrip1Data('');
+    setTrip2Data('');
+    setResult(null);
+    setTargetDate('');
+    try {
+      localStorage.removeItem('smarttrip_inputs');
+    } catch {
+      // 무시
+    }
+  };
 
   const extractDate = (text: string) => {
     if (!text || typeof text !== 'string') return null;
@@ -43,19 +88,35 @@ export default function SmartTripAnalyzer() {
     return null;
   };
 
+  // ✅ [업그레이드] 유연한 수량 인식
+  // 구분자(공백/탭/파이프)가 몇 개든, 구역코드 중간에 공백이 있어도 인식.
+  // 규칙: 맨 끝 숫자 = 수량, 나머지에서 공백/탭/파이프 모두 제거 = 구역코드
   const parseVolumeData = (text: string) => {
     const lines = text.trim().split('\n');
     const volumes: Record<string, number> = {};
     lines.forEach((line) => {
-      const parts = line.split('|').map((s) => s.trim());
+      const trimmed = line.trim();
+      if (!trimmed) return;
+      // 헤더/안내 줄 제외
       if (
-        parts.length >= 2 &&
-        parts[0] &&
-        !parts[0].includes('B&M') &&
-        !parts[0].includes('캠도물량')
-      ) {
-        volumes[parts[0]] = parseInt(parts[1]) || 0;
-      }
+        trimmed.includes('B&M') ||
+        trimmed.includes('캠도물량') ||
+        trimmed.includes('Trip')
+      )
+        return;
+
+      // "코드부분 ... 끝숫자" 형태에서 끝 숫자를 수량으로 분리
+      const match = trimmed.match(/^(.+?)[\s|]+(\d+)\s*$/);
+      if (!match) return;
+
+      // 코드 부분의 모든 공백/탭/파이프 제거 → 순수 구역코드
+      const code = match[1].replace(/[\s|]+/g, '');
+      const vol = parseInt(match[2]) || 0;
+
+      // 코드가 비어있거나 숫자만 있으면(=잘못된 줄) 제외
+      if (!code || /^\d+$/.test(code)) return;
+
+      volumes[code] = vol;
     });
     return volumes;
   };
@@ -66,8 +127,12 @@ export default function SmartTripAnalyzer() {
     lines.forEach((line) => {
       const parts = line.split('/').map((s) => s.trim());
       if (parts.length >= 2) {
-        if (!schedule[parts[1]]) schedule[parts[1]] = [];
-        schedule[parts[1]].push(parts[0]);
+        // ✅ 스케줄 구역코드도 공백 제거해서 통일
+        const route = parts[0].replace(/[\s|]+/g, '');
+        const worker = parts[1];
+        if (!route || !worker) return;
+        if (!schedule[worker]) schedule[worker] = [];
+        schedule[worker].push(route);
       }
     });
     return schedule;
@@ -115,6 +180,33 @@ export default function SmartTripAnalyzer() {
     const trip2Volumes = trip2Data ? parseVolumeData(trip2Data) : {};
     const schedule = parseScheduleData(scheduleData);
 
+    // ✅ [업그레이드] 배정된 구역 전체 집합 만들기 (미배정 경고용)
+    const assignedRoutes = new Set<string>();
+    Object.values(schedule).forEach((routes) => {
+      routes.forEach((route) => {
+        expandRoutes(route, trip1Volumes, trip2Volumes).forEach((r) => {
+          assignedRoutes.add(r);
+        });
+      });
+    });
+
+    // ✅ [업그레이드] 물량은 있는데(수량>0) 아무한테도 배정 안 된 구역 찾기
+    const allVolumeRoutes = new Set<string>([
+      ...Object.keys(trip1Volumes),
+      ...Object.keys(trip2Volumes),
+    ]);
+    const unassigned: { route: string; trip1: number; trip2: number; total: number }[] = [];
+    allVolumeRoutes.forEach((route) => {
+      const t1 = trip1Volumes[route] || 0;
+      const t2 = trip2Volumes[route] || 0;
+      const total = t1 + t2;
+      // 수량이 0이면 경고 대상 아님 (수량 0은 정상)
+      if (total > 0 && !assignedRoutes.has(route)) {
+        unassigned.push({ route, trip1: t1, trip2: t2, total });
+      }
+    });
+    unassigned.sort((a, b) => b.total - a.total);
+
     const workerVolumes: any = {};
     Object.entries(schedule).forEach(([worker, routes]) => {
       let trip1Total = 0,
@@ -156,6 +248,8 @@ export default function SmartTripAnalyzer() {
       trip2Total: totalTrip2,
       totalVolume: totalTrip1 + totalTrip2,
       workerCount: sorted.length,
+      unassigned, // ✅ 미배정 구역 목록
+      recognizedCount: allVolumeRoutes.size, // ✅ 인식된 구역 개수 (안심용)
     });
   };
 
@@ -204,6 +298,16 @@ export default function SmartTripAnalyzer() {
       }
       text += '\n';
     });
+
+    // ✅ [업그레이드] 미배정 구역이 있으면 복사 텍스트에도 경고 포함
+    if (result.unassigned && result.unassigned.length > 0) {
+      text += '⚠️ 미배정 구역 (배정 누락 확인 필요)\n';
+      result.unassigned.forEach((u: any) => {
+        const vol = hasTrip2 ? u.trip2 : u.trip1;
+        text += '  ∙ ' + u.route + ' (' + (vol > 0 ? vol : u.total) + ')\n';
+      });
+      text += '\n';
+    }
 
     navigator.clipboard
       .writeText(text)
@@ -459,7 +563,7 @@ export default function SmartTripAnalyzer() {
               <textarea
                 value={trip1Data}
                 onChange={(e) => setTrip1Data(e.target.value)}
-                placeholder="📦 예시:&#10;26.01.15Trip1 캠도물량&#10;B&M로지스&#10;501B01 | 24&#10;501B02 | 40&#10;..."
+                placeholder="📦 예시:&#10;26.01.15Trip1 캠도물량&#10;B&M로지스&#10;501B01 24&#10;501B02 40&#10;(공백/탭/| 무엇이든 인식됩니다)&#10;..."
                 style={{
                   width: '100%',
                   height: '16rem',
@@ -518,7 +622,7 @@ export default function SmartTripAnalyzer() {
               <textarea
                 value={trip2Data}
                 onChange={(e) => setTrip2Data(e.target.value)}
-                placeholder="📦 예시 (선택):&#10;26.01.15Trip2 캠도물량&#10;B&M로지스&#10;501B01 | 7&#10;501B02 | 15&#10;..."
+                placeholder="📦 예시 (선택):&#10;26.01.15Trip2 캠도물량&#10;B&M로지스&#10;501B01 7&#10;501B02 15&#10;..."
                 style={{
                   width: '100%',
                   height: '16rem',
@@ -562,8 +666,17 @@ export default function SmartTripAnalyzer() {
           </div>
         </div>
 
-        {/* 분석 버튼 */}
-        <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '3rem' }}>
+        {/* 버튼 영역 */}
+        <div
+          style={{
+            display: 'flex',
+            justifyContent: 'center',
+            alignItems: 'center',
+            gap: '1rem',
+            marginBottom: '3rem',
+            flexWrap: 'wrap',
+          }}
+        >
           <button
             onClick={analyze}
             style={{
@@ -591,9 +704,38 @@ export default function SmartTripAnalyzer() {
             <span style={{ fontSize: '2rem' }}>🔍</span>
             <span>분석 실행</span>
           </button>
+
+          {/* ✅ [업그레이드] 입력 초기화 버튼 */}
+          <button
+            onClick={resetInputs}
+            style={{
+              background: 'rgba(255, 255, 255, 0.15)',
+              backdropFilter: 'blur(10px)',
+              color: 'white',
+              fontWeight: 700,
+              padding: isMobile ? '1.2rem 1.8rem' : '1.5rem 2.5rem',
+              borderRadius: '20px',
+              border: '1px solid rgba(255, 255, 255, 0.3)',
+              fontSize: isMobile ? '1rem' : '1.1rem',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.6rem',
+              transition: 'all 0.3s',
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.background = 'rgba(255, 255, 255, 0.25)';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.background = 'rgba(255, 255, 255, 0.15)';
+            }}
+          >
+            <span style={{ fontSize: '1.4rem' }}>🗑️</span>
+            <span>입력 초기화</span>
+          </button>
         </div>
 
-        {/* 결과 표시 - 나머지 코드 동일 */}
+        {/* 결과 표시 */}
         {result && (
           <div
             style={{
@@ -662,129 +804,199 @@ export default function SmartTripAnalyzer() {
               </button>
             </div>
 
-            <div style={{ padding: '2.5rem' }}>
-<div style={{ padding: '2.5rem' }}>
-  {/* 요약 통계 */}
-  <div
-    style={{
-      display: 'grid',
-      gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
-      gap: '1.5rem',
-      marginBottom: '2rem'
-    }}
-  >
-    <div style={{
-      background: 'white',
-      borderRadius: '18px',
-      padding: '1.2rem',
-      boxShadow: '0 8px 20px rgba(0,0,0,0.08)'
-    }}>
-      <div style={{ fontSize: '0.9rem', color: '#64748b', fontWeight: 700 }}>총 인원</div>
-      <div style={{ fontSize: '2rem', fontWeight: 900, color: '#0f172a', marginTop: '0.25rem' }}>
-        {result.workerCount}명
-      </div>
-    </div>
+            <div style={{ padding: isMobile ? '1.5rem' : '2.5rem' }}>
+              {/* ✅ [업그레이드] 인식 확인 + 미배정 경고 */}
+              <div
+                style={{
+                  padding: '0.9rem 1.2rem',
+                  borderRadius: '14px',
+                  background: 'rgba(16, 185, 129, 0.12)',
+                  border: '1px solid rgba(16, 185, 129, 0.35)',
+                  color: '#065f46',
+                  fontWeight: 700,
+                  fontSize: '0.95rem',
+                  marginBottom: result.unassigned && result.unassigned.length > 0 ? '1rem' : '2rem',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.5rem',
+                }}
+              >
+                <span style={{ fontSize: '1.2rem' }}>✅</span>
+                <span>물량 데이터 {result.recognizedCount}개 구역 인식 완료</span>
+              </div>
 
-    <div style={{
-      background: 'white',
-      borderRadius: '18px',
-      padding: '1.2rem',
-      boxShadow: '0 8px 20px rgba(0,0,0,0.08)'
-    }}>
-      <div style={{ fontSize: '0.9rem', color: '#64748b', fontWeight: 700 }}>Trip1 총 수량</div>
-      <div style={{ fontSize: '2rem', fontWeight: 900, color: '#0f172a', marginTop: '0.25rem' }}>
-        {result.trip1Total.toLocaleString()}
-      </div>
-    </div>
-
-    <div style={{
-      background: 'white',
-      borderRadius: '18px',
-      padding: '1.2rem',
-      boxShadow: '0 8px 20px rgba(0,0,0,0.08)'
-    }}>
-      <div style={{ fontSize: '0.9rem', color: '#64748b', fontWeight: 700 }}>Trip2 총 수량</div>
-      <div style={{ fontSize: '2rem', fontWeight: 900, color: '#0f172a', marginTop: '0.25rem' }}>
-        {result.trip2Total.toLocaleString()}
-      </div>
-    </div>
-
-    <div style={{
-      background: 'white',
-      borderRadius: '18px',
-      padding: '1.2rem',
-      boxShadow: '0 8px 20px rgba(0,0,0,0.08)'
-    }}>
-      <div style={{ fontSize: '0.9rem', color: '#64748b', fontWeight: 700 }}>금일 총 수량</div>
-      <div style={{ fontSize: '2rem', fontWeight: 900, color: '#0f172a', marginTop: '0.25rem' }}>
-        {result.totalVolume.toLocaleString()}
-      </div>
-    </div>
-  </div>
-
-  {/* 작업자 리스트 */}
-  <div style={{ display: 'grid', gap: '1rem' }}>
-    {result.workers.map(([worker, data]: any, index: number) => {
-      const medal = index === 0 ? '👑' : index === 1 ? '🥈' : index === 2 ? '🥉' : '👤';
-      const hasTrip2 = result.trip2Total > 0;
-      const mainVol = hasTrip2 ? data.trip2 : data.trip1;
-
-      return (
-        <div
-          key={worker}
-          style={{
-            background: 'white',
-            borderRadius: '18px',
-            padding: '1.2rem',
-            boxShadow: '0 10px 25px rgba(0,0,0,0.08)',
-            border: '1px solid rgba(15, 23, 42, 0.06)'
-          }}
-        >
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: '1rem' }}>
-            <div style={{ fontSize: '1.15rem', fontWeight: 900, color: '#0f172a' }}>
-              {medal} {worker}
-            </div>
-            <div style={{ fontSize: '1.2rem', fontWeight: 900, color: '#111827' }}>
-              {mainVol.toLocaleString()}
-            </div>
-          </div>
-
-          {result.trip2Total > 0 && (
-            <div style={{ marginTop: '0.3rem', fontSize: '0.9rem', color: '#64748b', fontWeight: 700 }}>
-              금일 총합계: {data.total.toLocaleString()}
-            </div>
-          )}
-
-          <div style={{ marginTop: '0.8rem', display: 'grid', gap: '0.35rem' }}>
-            {data.routes
-              .map((r: any) => {
-                const vol = hasTrip2 ? r.trip2 : r.trip1;
-                return { ...r, vol };
-              })
-              .filter((r: any) => r.vol > 0)
-              .sort((a: any, b: any) => b.vol - a.vol)
-              .map((r: any) => (
+              {/* ✅ [업그레이드] 미배정 구역 경고 (물량은 있는데 배정 안 된 구역) */}
+              {result.unassigned && result.unassigned.length > 0 && (
                 <div
-                  key={r.route}
                   style={{
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                    padding: '0.55rem 0.75rem',
-                    borderRadius: '12px',
-                    background: 'rgba(15, 23, 42, 0.04)',
-                    fontFamily: "'Courier New', monospace"
+                    padding: '1.2rem 1.4rem',
+                    borderRadius: '16px',
+                    background: 'rgba(239, 68, 68, 0.1)',
+                    border: '2px solid rgba(239, 68, 68, 0.4)',
+                    marginBottom: '2rem',
                   }}
                 >
-                  <span style={{ fontWeight: 800, color: '#0f172a' }}>{r.route}</span>
-                  <span style={{ fontWeight: 900, color: '#111827' }}>{r.vol.toLocaleString()}</span>
+                  <div
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '0.6rem',
+                      fontSize: '1.1rem',
+                      fontWeight: 900,
+                      color: '#b91c1c',
+                      marginBottom: '0.8rem',
+                    }}
+                  >
+                    <span style={{ fontSize: '1.5rem' }}>⚠️</span>
+                    <span>미배정 구역 {result.unassigned.length}개 — 배정 누락 확인 필요!</span>
+                  </div>
+                  <div style={{ display: 'grid', gap: '0.4rem' }}>
+                    {result.unassigned.map((u: any) => {
+                      const hasTrip2 = result.trip2Total > 0;
+                      const vol = hasTrip2 ? (u.trip2 > 0 ? u.trip2 : u.total) : u.trip1;
+                      return (
+                        <div
+                          key={u.route}
+                          style={{
+                            display: 'flex',
+                            justifyContent: 'space-between',
+                            padding: '0.55rem 0.85rem',
+                            borderRadius: '10px',
+                            background: 'rgba(239, 68, 68, 0.08)',
+                            fontFamily: "'Courier New', monospace",
+                          }}
+                        >
+                          <span style={{ fontWeight: 800, color: '#991b1b' }}>{u.route}</span>
+                          <span style={{ fontWeight: 900, color: '#7f1d1d' }}>
+                            {vol.toLocaleString()}
+                          </span>
+                        </div>
+                      );
+                    })}
+                  </div>
                 </div>
-              ))}
-          </div>
-        </div>
-      );
-    })}
-  </div>
-</div>
+              )}
+
+              {/* 요약 통계 */}
+              <div
+                style={{
+                  display: 'grid',
+                  gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
+                  gap: '1.5rem',
+                  marginBottom: '2rem',
+                }}
+              >
+                <div style={{
+                  background: 'white',
+                  borderRadius: '18px',
+                  padding: '1.2rem',
+                  boxShadow: '0 8px 20px rgba(0,0,0,0.08)'
+                }}>
+                  <div style={{ fontSize: '0.9rem', color: '#64748b', fontWeight: 700 }}>총 인원</div>
+                  <div style={{ fontSize: '2rem', fontWeight: 900, color: '#0f172a', marginTop: '0.25rem' }}>
+                    {result.workerCount}명
+                  </div>
+                </div>
+
+                <div style={{
+                  background: 'white',
+                  borderRadius: '18px',
+                  padding: '1.2rem',
+                  boxShadow: '0 8px 20px rgba(0,0,0,0.08)'
+                }}>
+                  <div style={{ fontSize: '0.9rem', color: '#64748b', fontWeight: 700 }}>Trip1 총 수량</div>
+                  <div style={{ fontSize: '2rem', fontWeight: 900, color: '#0f172a', marginTop: '0.25rem' }}>
+                    {result.trip1Total.toLocaleString()}
+                  </div>
+                </div>
+
+                <div style={{
+                  background: 'white',
+                  borderRadius: '18px',
+                  padding: '1.2rem',
+                  boxShadow: '0 8px 20px rgba(0,0,0,0.08)'
+                }}>
+                  <div style={{ fontSize: '0.9rem', color: '#64748b', fontWeight: 700 }}>Trip2 총 수량</div>
+                  <div style={{ fontSize: '2rem', fontWeight: 900, color: '#0f172a', marginTop: '0.25rem' }}>
+                    {result.trip2Total.toLocaleString()}
+                  </div>
+                </div>
+
+                <div style={{
+                  background: 'white',
+                  borderRadius: '18px',
+                  padding: '1.2rem',
+                  boxShadow: '0 8px 20px rgba(0,0,0,0.08)'
+                }}>
+                  <div style={{ fontSize: '0.9rem', color: '#64748b', fontWeight: 700 }}>금일 총 수량</div>
+                  <div style={{ fontSize: '2rem', fontWeight: 900, color: '#0f172a', marginTop: '0.25rem' }}>
+                    {result.totalVolume.toLocaleString()}
+                  </div>
+                </div>
+              </div>
+
+              {/* 작업자 리스트 */}
+              <div style={{ display: 'grid', gap: '1rem' }}>
+                {result.workers.map(([worker, data]: any, index: number) => {
+                  const medal = index === 0 ? '👑' : index === 1 ? '🥈' : index === 2 ? '🥉' : '👤';
+                  const hasTrip2 = result.trip2Total > 0;
+                  const mainVol = hasTrip2 ? data.trip2 : data.trip1;
+
+                  return (
+                    <div
+                      key={worker}
+                      style={{
+                        background: 'white',
+                        borderRadius: '18px',
+                        padding: '1.2rem',
+                        boxShadow: '0 10px 25px rgba(0,0,0,0.08)',
+                        border: '1px solid rgba(15, 23, 42, 0.06)'
+                      }}
+                    >
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: '1rem' }}>
+                        <div style={{ fontSize: '1.15rem', fontWeight: 900, color: '#0f172a' }}>
+                          {medal} {worker}
+                        </div>
+                        <div style={{ fontSize: '1.2rem', fontWeight: 900, color: '#111827' }}>
+                          {mainVol.toLocaleString()}
+                        </div>
+                      </div>
+
+                      {result.trip2Total > 0 && (
+                        <div style={{ marginTop: '0.3rem', fontSize: '0.9rem', color: '#64748b', fontWeight: 700 }}>
+                          금일 총합계: {data.total.toLocaleString()}
+                        </div>
+                      )}
+
+                      <div style={{ marginTop: '0.8rem', display: 'grid', gap: '0.35rem' }}>
+                        {data.routes
+                          .map((r: any) => {
+                            const vol = hasTrip2 ? r.trip2 : r.trip1;
+                            return { ...r, vol };
+                          })
+                          .filter((r: any) => r.vol > 0)
+                          .sort((a: any, b: any) => b.vol - a.vol)
+                          .map((r: any) => (
+                            <div
+                              key={r.route}
+                              style={{
+                                display: 'flex',
+                                justifyContent: 'space-between',
+                                padding: '0.55rem 0.75rem',
+                                borderRadius: '12px',
+                                background: 'rgba(15, 23, 42, 0.04)',
+                                fontFamily: "'Courier New', monospace"
+                              }}
+                            >
+                              <span style={{ fontWeight: 800, color: '#0f172a' }}>{r.route}</span>
+                              <span style={{ fontWeight: 900, color: '#111827' }}>{r.vol.toLocaleString()}</span>
+                            </div>
+                          ))}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
             </div>
           </div>
         )}
