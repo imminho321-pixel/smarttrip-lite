@@ -377,13 +377,21 @@ export default function SmartTripAnalyzer() {
         }
         .st-logo-inner img { width: 100%; height: 100%; object-fit: cover; border-radius: 50%; }
         .st-brand {
-          font-family: 'Cormorant Garamond', serif;
-          font-size: 3rem;
-          font-weight: 600;
-          letter-spacing: 0.5px;
+          font-size: 2rem;
+          font-weight: 500;
+          letter-spacing: -0.5px;
           line-height: 1;
+          color: #d8d4c8;
         }
-        .st-brand .accent { color: #c9a227; }
+        .st-brand .accent {
+          font-family: 'Cormorant Garamond', serif;
+          font-size: 3.6rem;
+          font-weight: 700;
+          color: #c9a227;
+          letter-spacing: 0.5px;
+          margin-right: 0.2em;
+          vertical-align: -0.05em;
+        }
         .st-tagline {
           margin-top: 0.7rem;
           font-size: 0.8rem;
@@ -550,7 +558,8 @@ export default function SmartTripAnalyzer() {
 
         /* 모바일 */
         @media (max-width: 480px) {
-          .st-brand { font-size: 2.2rem; }
+          .st-brand { font-size: 1.6rem; }
+          .st-brand .accent { font-size: 2.8rem; }
           .st-rank-name { font-size: 1.3rem; }
           .st-rank-vol { font-size: 1.9rem; }
           .st-stat-num { font-size: 1.7rem; }
@@ -575,9 +584,9 @@ export default function SmartTripAnalyzer() {
             </div>
           </div>
           <div className="st-brand">
-            Smart<span className="accent">Trip</span>
+            <span className="accent">B&amp;M</span> 물량분석
           </div>
-          <div className="st-tagline">물량 분석 시스템</div>
+          <div className="st-tagline">캠도 물량 자동 분석</div>
         </div>
 
         {/* ✅ 입력 초기화 버튼을 입력 카드 위로 */}
