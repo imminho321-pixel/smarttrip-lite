@@ -286,7 +286,9 @@ export default function SmartTripAnalyzer() {
 
     // 복사 텍스트에도 표시 이름 적용 (김대원 → 대원♡빛나)
     result.workers.forEach(([worker, data]: any, index: number) => {
-      const emoji = index === 0 ? '👑' : index === 1 ? '🥈' : index === 2 ? '🥉' : '👤';
+      let emoji = index === 0 ? '👑' : index === 1 ? '🥈' : index === 2 ? '🥉' : '👤';
+      // 대원빛나(김대원)는 메달권(1~3위)이 아닐 때 오이 이모지로
+      if (worker === '김대원' && index >= 3) emoji = '🥒';
       const trip2Ratio =
         hasTrip2 && data.total > 0 ? ((data.trip2 / data.total) * 100).toFixed(2) : '0.00';
       const displayVolume = hasTrip2 ? data.trip2 : data.trip1;
