@@ -1038,24 +1038,44 @@ export default function SmartTripAnalyzer() {
         /* 헤더 */
         .st-header {
           text-align: center;
-          padding: 1.5rem 0 2.5rem;
-          border-bottom: 2px solid rgba(201,162,39,0.4);
+          padding: 3rem 1.5rem 3rem;
           margin-bottom: 2.5rem;
+          position: relative;
+          border-radius: 24px;
+          overflow: hidden;
+          background:
+            radial-gradient(ellipse 80% 60% at 50% 0%, rgba(201,162,39,0.15), transparent 70%),
+            radial-gradient(ellipse 60% 50% at 50% 100%, rgba(201,162,39,0.06), transparent 70%),
+            linear-gradient(180deg, #161310 0%, #0d0d0d 100%);
+          border: 1px solid rgba(201,162,39,0.2);
+        }
+        .st-header::before {
+          content: '';
+          position: absolute;
+          top: 0; left: 50%;
+          transform: translateX(-50%);
+          width: 60%; height: 2px;
+          background: linear-gradient(90deg, transparent, #c9a227, transparent);
         }
         .st-logo-ring {
-          width: 92px; height: 92px;
+          width: 150px; height: 150px;
           border-radius: 50%;
-          margin: 0 auto 1.4rem;
-          padding: 3px;
-          background: linear-gradient(135deg, #c9a227, #e8d48f, #c9a227);
+          margin: 0 auto 1.6rem;
+          padding: 4px;
+          background: linear-gradient(135deg, #e8d48f, #c9a227, #8a6d1f, #c9a227);
           display: flex; align-items: center; justify-content: center;
+          box-shadow:
+            0 0 40px rgba(201,162,39,0.4),
+            0 0 80px rgba(201,162,39,0.15),
+            inset 0 0 20px rgba(0,0,0,0.3);
+          position: relative;
         }
         .st-logo-inner {
           width: 100%; height: 100%;
           border-radius: 50%;
           background: #161616;
           display: flex; align-items: center; justify-content: center;
-          font-size: 2rem;
+          font-size: 3rem;
           overflow: hidden;
         }
         .st-logo-inner img { width: 100%; height: 100%; object-fit: cover; border-radius: 50%; }
@@ -1064,23 +1084,42 @@ export default function SmartTripAnalyzer() {
           font-weight: 500;
           letter-spacing: -0.5px;
           line-height: 1;
-          color: #d8d4c8;
+          color: #f5f4ef;
+          margin-top: 0.5rem;
         }
         .st-brand .accent {
           font-family: 'Cormorant Garamond', serif;
-          font-size: 3.6rem;
+          font-size: 3.8rem;
           font-weight: 700;
-          color: #c9a227;
+          color: #e8d48f;
           letter-spacing: 0.5px;
           margin-right: 0.2em;
           vertical-align: -0.05em;
+          text-shadow: 0 0 20px rgba(201,162,39,0.5), 0 0 40px rgba(201,162,39,0.2);
         }
         .st-tagline {
-          margin-top: 0.7rem;
-          font-size: 0.8rem;
-          letter-spacing: 4px;
-          color: #8a8a82;
+          margin-top: 0.9rem;
+          font-size: 0.82rem;
+          letter-spacing: 5px;
+          color: #9a8f6a;
           font-weight: 500;
+        }
+        .st-divider {
+          display: flex; align-items: center; justify-content: center;
+          gap: 0.8rem; margin-top: 1.4rem;
+        }
+        .st-divider .line {
+          height: 1px; width: 60px;
+          background: linear-gradient(90deg, transparent, rgba(201,162,39,0.6));
+        }
+        .st-divider .line.right {
+          background: linear-gradient(90deg, rgba(201,162,39,0.6), transparent);
+        }
+        .st-divider .diamond {
+          width: 6px; height: 6px;
+          background: #c9a227;
+          transform: rotate(45deg);
+          box-shadow: 0 0 8px rgba(201,162,39,0.6);
         }
 
         /* 입력 카드 */
@@ -1336,6 +1375,7 @@ export default function SmartTripAnalyzer() {
         @media (max-width: 480px) {
           .st-brand { font-size: 1.6rem; }
           .st-brand .accent { font-size: 2.8rem; }
+          .st-logo-ring { width: 120px; height: 120px; }
           .st-rank-name { font-size: 1.3rem; }
           .st-rank-vol { font-size: 1.9rem; }
           .st-stat-num { font-size: 1.7rem; }
@@ -1363,6 +1403,11 @@ export default function SmartTripAnalyzer() {
             <span className="accent">B&amp;M</span> 물량분석
           </div>
           <div className="st-tagline">캠도 물량 자동 분석</div>
+          <div className="st-divider">
+            <span className="line"></span>
+            <span className="diamond"></span>
+            <span className="line right"></span>
+          </div>
         </div>
 
         {/* ===== 탭 메뉴 ===== */}
