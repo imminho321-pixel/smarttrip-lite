@@ -262,12 +262,28 @@ export default function SmartTripAnalyzer() {
         },
       });
 
-      // 2-1) 사람별 총합 삽입 (1차+2차 합산 = 실제 배송 총량)
-      const rows = workers.map(([worker, data]) => ({
-        work_date: workDate,
-        worker_name: worker,
-        volume: data.total, // trip1 + trip2 (1차만 한 사람은 1차만, 둘다면 합산)
-      }));
+      // 2-1) 사람별 총합 삽입 (1차/2차 분리 저장)
+      const rows: any[] = [];
+      workers.forEach(([worker, data]) => {
+        // 1차가 있으면 trip=1로 저장
+        if (data.trip1 > 0) {
+          rows.push({
+            work_date: workDate,
+            worker_name: worker,
+            volume: data.trip1,
+            trip: 1,
+          });
+        }
+        // 2차가 있으면 trip=2로 저장
+        if (data.trip2 > 0) {
+          rows.push({
+            work_date: workDate,
+            worker_name: worker,
+            volume: data.trip2,
+            trip: 2,
+          });
+        }
+      });
 
       const res = await fetch(`${SUPABASE_URL}/rest/v1/daily_volume`, {
         method: 'POST',
@@ -280,17 +296,26 @@ export default function SmartTripAnalyzer() {
         body: JSON.stringify(rows),
       });
 
-      // 2-2) 노선별 상세 삽입 (검색용, 1차+2차 합산)
+      // 2-2) 노선별 상세 삽입 (검색용, 1차/2차 분리 저장)
       const routeRows: any[] = [];
       workers.forEach(([worker, data]) => {
         data.routes.forEach((r: any) => {
-          const vol = (r.trip1 || 0) + (r.trip2 || 0); // 노선별도 1차+2차 합산
-          if (vol > 0) {
+          if ((r.trip1 || 0) > 0) {
             routeRows.push({
               work_date: workDate,
               worker_name: worker,
               route: r.route,
-              volume: vol,
+              volume: r.trip1,
+              trip: 1,
+            });
+          }
+          if ((r.trip2 || 0) > 0) {
+            routeRows.push({
+              work_date: workDate,
+              worker_name: worker,
+              route: r.route,
+              volume: r.trip2,
+              trip: 2,
             });
           }
         });
@@ -397,7 +422,7 @@ export default function SmartTripAnalyzer() {
     setWorkerSearchResult(null);
     try {
       const res = await fetch(
-        `${SUPABASE_URL}/rest/v1/route_detail?work_date=gte.${searchStart}&work_date=lte.${searchEnd}&select=worker_name,route,volume,work_date`,
+        `${SUPABASE_URL}/rest/v1/route_detail?work_date=gte.${searchStart}&work_date=lte.${searchEnd}&select=worker_name,route,volume,work_date,trip`,
         {
           headers: {
             apikey: SUPABASE_KEY,
@@ -410,40 +435,76 @@ export default function SmartTripAnalyzer() {
         setSearchLoading(false);
         return;
       }
-      const rows: { worker_name: string; route: string; volume: number; work_date: string }[] =
+      const rows: { worker_name: string; route: string; volume: number; work_date: string; trip: number }[] =
         await res.json();
+
+      // 날짜별로 1차/2차 존재 여부 파악 (전체 기준: 그날 2차가 하나라도 있으면 2차 운영일)
+      const dateHasTrip1: Record<string, boolean> = {};
+      const dateHasTrip2: Record<string, boolean> = {};
+      rows.forEach((r) => {
+        if (r.trip === 1) dateHasTrip1[r.work_date] = true;
+        if (r.trip === 2) dateHasTrip2[r.work_date] = true;
+      });
+      // 완전한 날 = 1차도 있고 2차도 있는 날
+      const completeDates = new Set<string>();
+      Object.keys(dateHasTrip1).forEach((d) => {
+        if (dateHasTrip2[d]) completeDates.add(d);
+      });
 
       // 사람별로 묶기
       const byWorker: Record<
         string,
-        { total: number; routes: Record<string, number>; days: Set<string>; byDate: Record<string, number> }
+        {
+          total: number;
+          routes: Record<string, number>;
+          days: Set<string>;
+          byDate: Record<string, number>;
+          completeTotal: number; // 완전한 날만의 합 (평균용)
+          completeDays: Set<string>;
+        }
       > = {};
       rows.forEach((r) => {
         if (!byWorker[r.worker_name]) {
-          byWorker[r.worker_name] = { total: 0, routes: {}, days: new Set(), byDate: {} };
+          byWorker[r.worker_name] = {
+            total: 0,
+            routes: {},
+            days: new Set(),
+            byDate: {},
+            completeTotal: 0,
+            completeDays: new Set(),
+          };
         }
         byWorker[r.worker_name].total += r.volume || 0;
         byWorker[r.worker_name].routes[r.route] =
           (byWorker[r.worker_name].routes[r.route] || 0) + (r.volume || 0);
         byWorker[r.worker_name].days.add(r.work_date);
-        // 날짜별 합계
         byWorker[r.worker_name].byDate[r.work_date] =
           (byWorker[r.worker_name].byDate[r.work_date] || 0) + (r.volume || 0);
+        // 완전한 날이면 평균용 합계에도 추가
+        if (completeDates.has(r.work_date)) {
+          byWorker[r.worker_name].completeTotal += r.volume || 0;
+          byWorker[r.worker_name].completeDays.add(r.work_date);
+        }
       });
 
       const workers = Object.entries(byWorker)
-        .map(([name, d]) => ({
-          name,
-          total: d.total,
-          days: d.days.size,
-          routes: Object.entries(d.routes)
-            .map(([route, vol]) => ({ route, vol }))
-            .sort((a, b) => b.vol - a.vol),
-          // 날짜별 상세 (최신순)
-          dates: Object.entries(d.byDate)
-            .map(([date, vol]) => ({ date, vol }))
-            .sort((a, b) => b.date.localeCompare(a.date)),
-        }))
+        .map(([name, d]) => {
+          const completeDayCount = d.completeDays.size;
+          const avg = completeDayCount > 0 ? Math.round(d.completeTotal / completeDayCount) : null;
+          return {
+            name,
+            total: d.total,
+            days: d.days.size,
+            avg, // 하루 평균 (완전한 날만), 완전한 날 없으면 null
+            avgDays: completeDayCount, // 평균 계산에 쓰인 날 수
+            routes: Object.entries(d.routes)
+              .map(([route, vol]) => ({ route, vol }))
+              .sort((a, b) => b.vol - a.vol),
+            dates: Object.entries(d.byDate)
+              .map(([date, vol]) => ({ date, vol }))
+              .sort((a, b) => b.date.localeCompare(a.date)),
+          };
+        })
         .sort((a, b) => b.total - a.total);
 
       const grandTotal = workers.reduce((a, b) => a + b.total, 0);
@@ -464,7 +525,7 @@ export default function SmartTripAnalyzer() {
     setRouteSearchResult(null);
     try {
       const res = await fetch(
-        `${SUPABASE_URL}/rest/v1/route_detail?work_date=gte.${searchStart}&work_date=lte.${searchEnd}&select=worker_name,route,volume,work_date`,
+        `${SUPABASE_URL}/rest/v1/route_detail?work_date=gte.${searchStart}&work_date=lte.${searchEnd}&select=worker_name,route,volume,work_date,trip`,
         {
           headers: {
             apikey: SUPABASE_KEY,
@@ -477,13 +538,26 @@ export default function SmartTripAnalyzer() {
         setSearchLoading(false);
         return;
       }
-      const rows: { worker_name: string; route: string; volume: number; work_date: string }[] =
+      const rows: { worker_name: string; route: string; volume: number; work_date: string; trip: number }[] =
         await res.json();
+
+      // 노선별로 1차/2차 존재 여부 파악 (노선 기준: 그 노선이 그날 1차도 2차도 있으면 완전한 날)
+      const routeDateTrip: Record<string, { t1: Set<string>; t2: Set<string> }> = {};
+      rows.forEach((r) => {
+        if (!routeDateTrip[r.route]) routeDateTrip[r.route] = { t1: new Set(), t2: new Set() };
+        if (r.trip === 1) routeDateTrip[r.route].t1.add(r.work_date);
+        if (r.trip === 2) routeDateTrip[r.route].t2.add(r.work_date);
+      });
 
       // 노선별로 묶기
       const byRoute: Record<
         string,
-        { total: number; workers: Record<string, number>; days: Set<string>; byDate: Record<string, number> }
+        {
+          total: number;
+          workers: Record<string, number>;
+          days: Set<string>;
+          byDate: Record<string, number>;
+        }
       > = {};
       rows.forEach((r) => {
         if (!byRoute[r.route]) {
@@ -493,24 +567,40 @@ export default function SmartTripAnalyzer() {
         byRoute[r.route].workers[r.worker_name] =
           (byRoute[r.route].workers[r.worker_name] || 0) + (r.volume || 0);
         byRoute[r.route].days.add(r.work_date);
-        // 날짜별 합계
         byRoute[r.route].byDate[r.work_date] =
           (byRoute[r.route].byDate[r.work_date] || 0) + (r.volume || 0);
       });
 
       const routes = Object.entries(byRoute)
-        .map(([route, d]) => ({
-          route,
-          total: d.total,
-          days: d.days.size,
-          workers: Object.entries(d.workers)
-            .map(([name, vol]) => ({ name, vol }))
-            .sort((a, b) => b.vol - a.vol),
-          // 날짜별 상세 (최신순)
-          dates: Object.entries(d.byDate)
-            .map(([date, vol]) => ({ date, vol }))
-            .sort((a, b) => b.date.localeCompare(a.date)),
-        }))
+        .map(([route, d]) => {
+          // 완전한 날 = 그 노선이 1차도 있고 2차도 있는 날
+          const trips = routeDateTrip[route];
+          const completeDates: string[] = [];
+          if (trips) {
+            trips.t1.forEach((dt) => {
+              if (trips.t2.has(dt)) completeDates.push(dt);
+            });
+          }
+          let completeTotal = 0;
+          completeDates.forEach((dt) => {
+            completeTotal += d.byDate[dt] || 0;
+          });
+          const avg = completeDates.length > 0 ? Math.round(completeTotal / completeDates.length) : null;
+
+          return {
+            route,
+            total: d.total,
+            days: d.days.size,
+            avg, // 하루 평균 (완전한 날만)
+            avgDays: completeDates.length,
+            workers: Object.entries(d.workers)
+              .map(([name, vol]) => ({ name, vol }))
+              .sort((a, b) => b.vol - a.vol),
+            dates: Object.entries(d.byDate)
+              .map(([date, vol]) => ({ date, vol }))
+              .sort((a, b) => b.date.localeCompare(a.date)),
+          };
+        })
         .sort((a, b) => a.route.localeCompare(b.route)); // 노선코드 순 정렬
 
       const grandTotal = routes.reduce((a, b) => a + b.total, 0);
