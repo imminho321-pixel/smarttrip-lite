@@ -490,6 +490,47 @@ export default function SmartTripAnalyzer() {
     setSearchLoading(false);
   };
 
+  // ===== 인원별 검색 결과 복사 =====
+  const copyWorkerSearch = () => {
+    if (!workerSearchResult || workerSearchResult.error || workerSearchResult.workers.length === 0) return;
+    let text = '📊 인원별 물량 집계\n';
+    text += workerSearchResult.start + ' ~ ' + workerSearchResult.end + '\n';
+    text += '총 수량: ' + workerSearchResult.grandTotal.toLocaleString() + '\n\n';
+    workerSearchResult.workers.forEach((w: any, idx: number) => {
+      const emoji = idx === 0 ? '👑' : idx === 1 ? '🥈' : idx === 2 ? '🥉' : '👤';
+      const nm = w.name === '김대원' ? '대원♡빛나' : w.name;
+      text += emoji + ' ' + nm + ' (' + w.total.toLocaleString() + ') · ' + w.days + '일 근무\n';
+      w.routes.forEach((r: any) => {
+        text += '  ∙ ' + r.route + ' (' + r.vol + ')\n';
+      });
+      text += '\n';
+    });
+    navigator.clipboard.writeText(text).then(
+      () => alert('✅ 복사 완료!'),
+      () => alert('❌ 복사 실패')
+    );
+  };
+
+  // ===== 노선별 검색 결과 복사 =====
+  const copyRouteSearch = () => {
+    if (!routeSearchResult || routeSearchResult.error || routeSearchResult.routes.length === 0) return;
+    let text = '🛣️ 노선별 물량 집계\n';
+    text += routeSearchResult.start + ' ~ ' + routeSearchResult.end + '\n';
+    text += '총 수량: ' + routeSearchResult.grandTotal.toLocaleString() + '\n\n';
+    routeSearchResult.routes.forEach((r: any) => {
+      text += r.route + ' (' + r.total.toLocaleString() + ') · ' + r.days + '일 운영\n';
+      r.workers.forEach((w: any) => {
+        const nm = w.name === '김대원' ? '대원♡빛나' : w.name;
+        text += '  ∙ ' + nm + ' (' + w.vol + ')\n';
+      });
+      text += '\n';
+    });
+    navigator.clipboard.writeText(text).then(
+      () => alert('✅ 복사 완료!'),
+      () => alert('❌ 복사 실패')
+    );
+  };
+
   const analyze = () => {
     // 1) 빈 입력 체크
     if (!scheduleData.trim() && !trip1Data.trim()) {
@@ -1469,7 +1510,7 @@ export default function SmartTripAnalyzer() {
                                     marginLeft: '0.6rem',
                                   }}
                                 >
-                                  {w.days}일
+                                  {w.days}일 근무
                                 </span>
                               </div>
                               <div className="st-rank-vol">{w.total.toLocaleString()}</div>
@@ -1555,6 +1596,28 @@ export default function SmartTripAnalyzer() {
                   >
                     총 {workerSearchResult.grandTotal.toLocaleString()}
                   </div>
+                  {workerSearchResult.workers.length > 0 && (
+                    <button
+                      onClick={copyWorkerSearch}
+                      style={{
+                        marginTop: '0.8rem',
+                        background: 'linear-gradient(135deg, #c9a227, #e8d48f)',
+                        color: '#1a1407',
+                        fontWeight: 700,
+                        fontSize: '0.95rem',
+                        padding: '0.6rem 1.6rem',
+                        borderRadius: '12px',
+                        border: 'none',
+                        cursor: 'pointer',
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '0.4rem',
+                      }}
+                    >
+                      <span>📋</span>
+                      <span>결과 복사하기</span>
+                    </button>
+                  )}
                 </div>
 
                 {workerSearchResult.workers.length === 0 ? (
@@ -1579,7 +1642,7 @@ export default function SmartTripAnalyzer() {
                                 w.name
                               )}
                               <span style={{ fontSize: '0.8rem', color: '#8a8a82', fontWeight: 400, marginLeft: '0.6rem' }}>
-                                {w.days}일
+                                {w.days}일 근무
                               </span>
                             </div>
                             <div className="st-rank-vol">{w.total.toLocaleString()}</div>
@@ -1670,6 +1733,28 @@ export default function SmartTripAnalyzer() {
                   >
                     총 {routeSearchResult.grandTotal.toLocaleString()}
                   </div>
+                  {routeSearchResult.routes.length > 0 && (
+                    <button
+                      onClick={copyRouteSearch}
+                      style={{
+                        marginTop: '0.8rem',
+                        background: 'linear-gradient(135deg, #c9a227, #e8d48f)',
+                        color: '#1a1407',
+                        fontWeight: 700,
+                        fontSize: '0.95rem',
+                        padding: '0.6rem 1.6rem',
+                        borderRadius: '12px',
+                        border: 'none',
+                        cursor: 'pointer',
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '0.4rem',
+                      }}
+                    >
+                      <span>📋</span>
+                      <span>결과 복사하기</span>
+                    </button>
+                  )}
                 </div>
 
                 {routeSearchResult.routes.length === 0 ? (
@@ -1687,7 +1772,7 @@ export default function SmartTripAnalyzer() {
                           >
                             {r.route}
                             <span style={{ fontSize: '0.8rem', color: '#8a8a82', fontWeight: 400, marginLeft: '0.6rem' }}>
-                              {r.days}일
+                              {r.days}일 운영
                             </span>
                           </div>
                           <div className="st-rank-vol">{r.total.toLocaleString()}</div>
