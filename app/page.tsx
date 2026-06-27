@@ -77,6 +77,8 @@ export default function SmartTripAnalyzer() {
 
   // 인원별 검색에서 펼친 사람 (날짜별 상세 보기)
   const [expandedWorker, setExpandedWorker] = useState<string | null>(null);
+  // 노선별 검색에서 펼친 노선 (날짜별 상세 보기)
+  const [expandedRoute, setExpandedRoute] = useState<string | null>(null);
 
   // ✅ 이름 표시 변환 (화면에만 적용, 복사는 원래 이름 유지)
   const displayName = (name: string) => {
@@ -479,15 +481,21 @@ export default function SmartTripAnalyzer() {
         await res.json();
 
       // 노선별로 묶기
-      const byRoute: Record<string, { total: number; workers: Record<string, number>; days: Set<string> }> = {};
+      const byRoute: Record<
+        string,
+        { total: number; workers: Record<string, number>; days: Set<string>; byDate: Record<string, number> }
+      > = {};
       rows.forEach((r) => {
         if (!byRoute[r.route]) {
-          byRoute[r.route] = { total: 0, workers: {}, days: new Set() };
+          byRoute[r.route] = { total: 0, workers: {}, days: new Set(), byDate: {} };
         }
         byRoute[r.route].total += r.volume || 0;
         byRoute[r.route].workers[r.worker_name] =
           (byRoute[r.route].workers[r.worker_name] || 0) + (r.volume || 0);
         byRoute[r.route].days.add(r.work_date);
+        // 날짜별 합계
+        byRoute[r.route].byDate[r.work_date] =
+          (byRoute[r.route].byDate[r.work_date] || 0) + (r.volume || 0);
       });
 
       const routes = Object.entries(byRoute)
@@ -498,6 +506,10 @@ export default function SmartTripAnalyzer() {
           workers: Object.entries(d.workers)
             .map(([name, vol]) => ({ name, vol }))
             .sort((a, b) => b.vol - a.vol),
+          // 날짜별 상세 (최신순)
+          dates: Object.entries(d.byDate)
+            .map(([date, vol]) => ({ date, vol }))
+            .sort((a, b) => b.date.localeCompare(a.date)),
         }))
         .sort((a, b) => a.route.localeCompare(b.route)); // 노선코드 순 정렬
 
@@ -1906,30 +1918,82 @@ export default function SmartTripAnalyzer() {
                   </div>
                 ) : (
                   <div className="st-ranks">
-                    {routeSearchResult.routes.map((r: any) => (
-                      <div key={r.route} className="st-rank-card">
-                        <div className="st-rank-row">
-                          <div
-                            className="st-rank-name"
-                            style={{ fontFamily: "'Courier New', monospace", fontSize: '1.3rem' }}
-                          >
-                            {r.route}
-                            <span style={{ fontSize: '0.8rem', color: '#8a8a82', fontWeight: 400, marginLeft: '0.6rem' }}>
-                              {r.days}일 운영
-                            </span>
+                    {routeSearchResult.routes.map((r: any) => {
+                      const isExpanded = expandedRoute === r.route;
+                      return (
+                        <div
+                          key={r.route}
+                          className="st-rank-card"
+                          onClick={() => setExpandedRoute(isExpanded ? null : r.route)}
+                          style={{ cursor: 'pointer' }}
+                        >
+                          <div className="st-rank-row">
+                            <div
+                              className="st-rank-name"
+                              style={{ fontFamily: "'Courier New', monospace", fontSize: '1.3rem' }}
+                            >
+                              {r.route}
+                              <span style={{ fontSize: '0.8rem', color: '#8a8a82', fontWeight: 400, marginLeft: '0.6rem', fontFamily: "'Noto Sans KR', sans-serif" }}>
+                                {r.days}일 운영
+                              </span>
+                              <span style={{ fontSize: '0.75rem', color: '#c9a227', marginLeft: '0.5rem', fontFamily: "'Noto Sans KR', sans-serif" }}>
+                                {isExpanded ? '▲ 접기' : '▼ 날짜별'}
+                              </span>
+                            </div>
+                            <div className="st-rank-vol">{r.total.toLocaleString()}</div>
                           </div>
-                          <div className="st-rank-vol">{r.total.toLocaleString()}</div>
+
+                          {/* 날짜별 상세 (클릭 시 펼쳐짐) */}
+                          {isExpanded && r.dates && (
+                            <div
+                              style={{
+                                marginTop: '0.9rem',
+                                paddingTop: '0.9rem',
+                                borderTop: '1px solid rgba(201,162,39,0.2)',
+                              }}
+                            >
+                              <div style={{ fontSize: '0.75rem', color: '#c9a227', letterSpacing: '1px', marginBottom: '0.6rem' }}>
+                                날짜별 물량
+                              </div>
+                              <div style={{ display: 'grid', gap: '0.4rem' }}>
+                                {r.dates.map((d: any) => {
+                                  const dt = new Date(d.date + 'T00:00:00');
+                                  const wd = ['일', '월', '화', '수', '목', '금', '토'][dt.getDay()];
+                                  const label = `${dt.getMonth() + 1}/${dt.getDate()}(${wd})`;
+                                  return (
+                                    <div
+                                      key={d.date}
+                                      style={{
+                                        display: 'flex',
+                                        justifyContent: 'space-between',
+                                        padding: '0.55rem 0.85rem',
+                                        borderRadius: '10px',
+                                        background: 'rgba(201,162,39,0.06)',
+                                        border: '1px solid rgba(201,162,39,0.12)',
+                                      }}
+                                    >
+                                      <span style={{ color: '#d8d4c8', fontWeight: 600 }}>{label}</span>
+                                      <span style={{ color: '#e8d48f', fontWeight: 800, fontVariantNumeric: 'tabular-nums' }}>
+                                        {d.vol.toLocaleString()}
+                                      </span>
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            </div>
+                          )}
+
+                          <div className="st-detail-routes">
+                            {r.workers.map((w: any) => (
+                              <span key={w.name} className="st-chip">
+                                {w.name === '김대원' ? '대원♡빛나' : w.name}
+                                <b>{w.vol.toLocaleString()}</b>
+                              </span>
+                            ))}
+                          </div>
                         </div>
-                        <div className="st-detail-routes">
-                          {r.workers.map((w: any) => (
-                            <span key={w.name} className="st-chip">
-                              {w.name === '김대원' ? '대원♡빛나' : w.name}
-                              <b>{w.vol.toLocaleString()}</b>
-                            </span>
-                          ))}
-                        </div>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 )}
               </div>
