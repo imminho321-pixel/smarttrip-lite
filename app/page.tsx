@@ -464,6 +464,97 @@ export default function SmartTripAnalyzer() {
     setSearchLoading(false);
   };
 
+  // ===== 입력칸 공유: 저장 (날짜별로 덮어쓰기) =====
+  const shareSave = async () => {
+    if (!scheduleData.trim() && !trip1Data.trim() && !trip2Data.trim()) {
+      alert('⚠️ 저장할 내용이 없습니다. 먼저 입력해주세요.');
+      return;
+    }
+    // 입력 텍스트에서 날짜 추출 (없으면 오늘 날짜)
+    const dateFromInput =
+      extractDate(scheduleData) || extractDate(trip1Data) || extractDate(trip2Data) || todayStr;
+
+    setShareStatus('saving');
+    try {
+      // 같은 날짜 기존 입력 삭제 후 새로 저장 (덮어쓰기)
+      await fetch(`${SUPABASE_URL}/rest/v1/shared_input?work_date=eq.${dateFromInput}`, {
+        method: 'DELETE',
+        headers: {
+          apikey: SUPABASE_KEY,
+          Authorization: `Bearer ${SUPABASE_KEY}`,
+        },
+      });
+
+      const res = await fetch(`${SUPABASE_URL}/rest/v1/shared_input`, {
+        method: 'POST',
+        headers: {
+          apikey: SUPABASE_KEY,
+          Authorization: `Bearer ${SUPABASE_KEY}`,
+          'Content-Type': 'application/json',
+          Prefer: 'return=minimal',
+        },
+        body: JSON.stringify([
+          {
+            work_date: dateFromInput,
+            schedule_data: scheduleData,
+            trip1_data: trip1Data,
+            trip2_data: trip2Data,
+          },
+        ]),
+      });
+
+      if (res.ok) {
+        setShareStatus('saved');
+        setTimeout(() => setShareStatus(''), 3000);
+      } else {
+        setShareStatus('error');
+      }
+    } catch {
+      setShareStatus('error');
+    }
+  };
+
+  // ===== 입력칸 공유: 불러오기 (가장 최근 저장된 입력) =====
+  const shareLoad = async () => {
+    setShareStatus('loading');
+    try {
+      const res = await fetch(
+        `${SUPABASE_URL}/rest/v1/shared_input?select=schedule_data,trip1_data,trip2_data,work_date,updated_at&order=updated_at.desc&limit=1`,
+        {
+          headers: {
+            apikey: SUPABASE_KEY,
+            Authorization: `Bearer ${SUPABASE_KEY}`,
+          },
+        }
+      );
+      if (!res.ok) {
+        setShareStatus('error');
+        return;
+      }
+      const rows = await res.json();
+      if (!rows || rows.length === 0) {
+        alert('📭 공유된 입력 내용이 없습니다.\n먼저 다른 기기에서 "공유 저장"을 눌러주세요.');
+        setShareStatus('');
+        return;
+      }
+      const data = rows[0];
+      // 현재 입력칸에 내용이 있으면 덮어쓰기 확인
+      if (scheduleData.trim() || trip1Data.trim() || trip2Data.trim()) {
+        if (!confirm('현재 입력한 내용을 공유된 내용으로 덮어쓸까요?')) {
+          setShareStatus('');
+          return;
+        }
+      }
+      setScheduleData(data.schedule_data || '');
+      setTrip1Data(data.trip1_data || '');
+      setTrip2Data(data.trip2_data || '');
+      setShareStatus('loaded');
+      setTimeout(() => setShareStatus(''), 3000);
+    } catch {
+      setShareStatus('error');
+    }
+  };
+
   const analyze = () => {
     // 1) 빈 입력 체크
     if (!scheduleData.trim() && !trip1Data.trim()) {
@@ -1042,8 +1133,73 @@ export default function SmartTripAnalyzer() {
         {/* ===== 탭 1: 오늘 분석 ===== */}
         {activeTab === 'analyze' && (
         <div>
-        {/* ✅ 입력 초기화 버튼을 입력 카드 위로 */}
-        <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '1rem' }}>
+        {/* ✅ 공유 버튼 + 입력 초기화 버튼 */}
+        <div
+          style={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            marginBottom: '1rem',
+            flexWrap: 'wrap',
+            gap: '0.6rem',
+          }}
+        >
+          <div style={{ display: 'flex', gap: '0.6rem', alignItems: 'center', flexWrap: 'wrap' }}>
+            <button
+              onClick={shareSave}
+              style={{
+                background: 'rgba(201,162,39,0.12)',
+                border: '1px solid rgba(201,162,39,0.4)',
+                borderRadius: '12px',
+                color: '#e8d48f',
+                fontWeight: 700,
+                fontSize: '0.95rem',
+                padding: '0.7rem 1.2rem',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.4rem',
+              }}
+            >
+              <span>📤</span>
+              <span>공유 저장</span>
+            </button>
+            <button
+              onClick={shareLoad}
+              style={{
+                background: 'rgba(201,162,39,0.12)',
+                border: '1px solid rgba(201,162,39,0.4)',
+                borderRadius: '12px',
+                color: '#e8d48f',
+                fontWeight: 700,
+                fontSize: '0.95rem',
+                padding: '0.7rem 1.2rem',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.4rem',
+              }}
+            >
+              <span>📥</span>
+              <span>불러오기</span>
+            </button>
+            {shareStatus === 'saving' && (
+              <span style={{ fontSize: '0.82rem', color: '#8a8a82' }}>☁️ 저장 중...</span>
+            )}
+            {shareStatus === 'saved' && (
+              <span style={{ fontSize: '0.82rem', color: '#9aca7a' }}>✓ 공유 저장 완료</span>
+            )}
+            {shareStatus === 'loading' && (
+              <span style={{ fontSize: '0.82rem', color: '#8a8a82' }}>☁️ 불러오는 중...</span>
+            )}
+            {shareStatus === 'loaded' && (
+              <span style={{ fontSize: '0.82rem', color: '#9aca7a' }}>✓ 불러오기 완료</span>
+            )}
+            {shareStatus === 'error' && (
+              <span style={{ fontSize: '0.82rem', color: '#e89a82' }}>⚠️ 실패 (인터넷 확인)</span>
+            )}
+          </div>
+
           <button className="st-btn-reset" onClick={resetInputs}>
             <span style={{ fontSize: '1.2rem' }}>🗑️</span>
             <span>입력 초기화</span>
