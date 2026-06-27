@@ -1083,7 +1083,7 @@ export default function SmartTripAnalyzer() {
           z-index: 2;
           width: 100%;
           text-align: center;
-          padding: 2rem 1.5rem 1.8rem;
+          padding: 2rem 1.5rem 1rem;
         }
         .st-brand {
           font-size: 2.2rem;
@@ -1396,11 +1396,6 @@ export default function SmartTripAnalyzer() {
           <div className="st-header-content">
             <div className="st-brand">
               <span className="accent">B&amp;M</span> 물량분석
-            </div>
-            <div className="st-divider">
-              <span className="line"></span>
-              <span className="diamond"></span>
-              <span className="line right"></span>
             </div>
           </div>
         </div>
