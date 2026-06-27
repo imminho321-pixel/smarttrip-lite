@@ -75,6 +75,9 @@ export default function SmartTripAnalyzer() {
   const [routeSearchResult, setRouteSearchResult] = useState<any>(null);
   const [searchLoading, setSearchLoading] = useState(false);
 
+  // 인원별 검색에서 펼친 사람 (날짜별 상세 보기)
+  const [expandedWorker, setExpandedWorker] = useState<string | null>(null);
+
   // ✅ 이름 표시 변환 (화면에만 적용, 복사는 원래 이름 유지)
   const displayName = (name: string) => {
     if (name === '김대원') return '대원♡빛나';
@@ -409,15 +412,21 @@ export default function SmartTripAnalyzer() {
         await res.json();
 
       // 사람별로 묶기
-      const byWorker: Record<string, { total: number; routes: Record<string, number>; days: Set<string> }> = {};
+      const byWorker: Record<
+        string,
+        { total: number; routes: Record<string, number>; days: Set<string>; byDate: Record<string, number> }
+      > = {};
       rows.forEach((r) => {
         if (!byWorker[r.worker_name]) {
-          byWorker[r.worker_name] = { total: 0, routes: {}, days: new Set() };
+          byWorker[r.worker_name] = { total: 0, routes: {}, days: new Set(), byDate: {} };
         }
         byWorker[r.worker_name].total += r.volume || 0;
         byWorker[r.worker_name].routes[r.route] =
           (byWorker[r.worker_name].routes[r.route] || 0) + (r.volume || 0);
         byWorker[r.worker_name].days.add(r.work_date);
+        // 날짜별 합계
+        byWorker[r.worker_name].byDate[r.work_date] =
+          (byWorker[r.worker_name].byDate[r.work_date] || 0) + (r.volume || 0);
       });
 
       const workers = Object.entries(byWorker)
@@ -428,6 +437,10 @@ export default function SmartTripAnalyzer() {
           routes: Object.entries(d.routes)
             .map(([route, vol]) => ({ route, vol }))
             .sort((a, b) => b.vol - a.vol),
+          // 날짜별 상세 (최신순)
+          dates: Object.entries(d.byDate)
+            .map(([date, vol]) => ({ date, vol }))
+            .sort((a, b) => b.date.localeCompare(a.date)),
         }))
         .sort((a, b) => b.total - a.total);
 
@@ -1711,8 +1724,14 @@ export default function SmartTripAnalyzer() {
                         idx === 0 ? 'badge-1' : idx === 1 ? 'badge-2' : idx === 2 ? 'badge-3' : 'badge-n';
                       const topVol = workerSearchResult.workers[0].total || 1;
                       const barW = Math.max(5, (w.total / topVol) * 100);
+                      const isExpanded = expandedWorker === w.name;
                       return (
-                        <div key={w.name} className={'st-rank-card' + (idx < 3 ? ' top' : '')}>
+                        <div
+                          key={w.name}
+                          className={'st-rank-card' + (idx < 3 ? ' top' : '')}
+                          onClick={() => setExpandedWorker(isExpanded ? null : w.name)}
+                          style={{ cursor: 'pointer' }}
+                        >
                           <div className="st-rank-row">
                             <div className={'st-rank-badge ' + badgeClass}>{idx + 1}</div>
                             <div className="st-rank-name">
@@ -1724,12 +1743,56 @@ export default function SmartTripAnalyzer() {
                               <span style={{ fontSize: '0.8rem', color: '#8a8a82', fontWeight: 400, marginLeft: '0.6rem' }}>
                                 {w.days}일 근무
                               </span>
+                              <span style={{ fontSize: '0.75rem', color: '#c9a227', marginLeft: '0.5rem' }}>
+                                {isExpanded ? '▲ 접기' : '▼ 날짜별'}
+                              </span>
                             </div>
                             <div className="st-rank-vol">{w.total.toLocaleString()}</div>
                           </div>
                           <div className="st-bar-track">
                             <div className="st-bar-fill" style={{ width: barW + '%' }} />
                           </div>
+
+                          {/* 날짜별 상세 (클릭 시 펼쳐짐) */}
+                          {isExpanded && w.dates && (
+                            <div
+                              style={{
+                                marginTop: '0.9rem',
+                                paddingTop: '0.9rem',
+                                borderTop: '1px solid rgba(201,162,39,0.2)',
+                              }}
+                            >
+                              <div style={{ fontSize: '0.75rem', color: '#c9a227', letterSpacing: '1px', marginBottom: '0.6rem' }}>
+                                날짜별 물량
+                              </div>
+                              <div style={{ display: 'grid', gap: '0.4rem' }}>
+                                {w.dates.map((d: any) => {
+                                  const dt = new Date(d.date + 'T00:00:00');
+                                  const wd = ['일', '월', '화', '수', '목', '금', '토'][dt.getDay()];
+                                  const label = `${dt.getMonth() + 1}/${dt.getDate()}(${wd})`;
+                                  return (
+                                    <div
+                                      key={d.date}
+                                      style={{
+                                        display: 'flex',
+                                        justifyContent: 'space-between',
+                                        padding: '0.55rem 0.85rem',
+                                        borderRadius: '10px',
+                                        background: 'rgba(201,162,39,0.06)',
+                                        border: '1px solid rgba(201,162,39,0.12)',
+                                      }}
+                                    >
+                                      <span style={{ color: '#d8d4c8', fontWeight: 600 }}>{label}</span>
+                                      <span style={{ color: '#e8d48f', fontWeight: 800, fontVariantNumeric: 'tabular-nums' }}>
+                                        {d.vol.toLocaleString()}
+                                      </span>
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            </div>
+                          )}
+
                           <div className="st-detail-routes">
                             {w.routes.map((r: any) => (
                               <span key={r.route} className="st-chip">
