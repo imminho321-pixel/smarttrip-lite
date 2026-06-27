@@ -48,6 +48,27 @@ export default function SmartTripAnalyzer() {
   const [monthlyLoading, setMonthlyLoading] = useState(false);
   const [saveStatus, setSaveStatus] = useState<string>('');
 
+  // 공유 입력 상태
+  const [shareStatus, setShareStatus] = useState<string>('');
+  const [sharedInfo, setSharedInfo] = useState<{ by: string; at: string } | null>(null);
+
+  // 탭 상태: 'analyze' | 'worker' | 'route'
+  const [activeTab, setActiveTab] = useState<'analyze' | 'worker' | 'route'>('analyze');
+
+  // 검색 기간 (기본: 이번 정산월)
+  const todayStr = (() => {
+    const n = new Date();
+    return `${n.getFullYear()}-${String(n.getMonth() + 1).padStart(2, '0')}-${String(n.getDate()).padStart(2, '0')}`;
+  })();
+  const defaultPeriod = getBillingPeriod(todayStr);
+  const [searchStart, setSearchStart] = useState(defaultPeriod.start);
+  const [searchEnd, setSearchEnd] = useState(defaultPeriod.end);
+
+  // 검색 결과
+  const [workerSearchResult, setWorkerSearchResult] = useState<any>(null);
+  const [routeSearchResult, setRouteSearchResult] = useState<any>(null);
+  const [searchLoading, setSearchLoading] = useState(false);
+
   // ✅ 이름 표시 변환 (화면에만 적용, 복사는 원래 이름 유지)
   const displayName = (name: string) => {
     if (name === '김대원') return '대원♡빛나';
@@ -180,7 +201,7 @@ export default function SmartTripAnalyzer() {
     return subRoutes.size > 0 ? Array.from(subRoutes).sort() : [route];
   };
 
-  // ===== Supabase: 그날 사람별 물량 저장 (날짜 기준 덮어쓰기) =====
+  // ===== Supabase: 그날 사람별 물량 + 노선별 상세 저장 (날짜 기준 덮어쓰기) =====
   const saveToCloud = async (
     workDate: string,
     workers: [string, any][],
@@ -189,21 +210,25 @@ export default function SmartTripAnalyzer() {
     setSaveStatus('saving');
     try {
       // 1) 같은 날짜 기존 데이터 먼저 삭제 (덮어쓰기 = 중복 방지)
-      await fetch(
-        `${SUPABASE_URL}/rest/v1/daily_volume?work_date=eq.${workDate}`,
-        {
-          method: 'DELETE',
-          headers: {
-            apikey: SUPABASE_KEY,
-            Authorization: `Bearer ${SUPABASE_KEY}`,
-          },
-        }
-      );
+      await fetch(`${SUPABASE_URL}/rest/v1/daily_volume?work_date=eq.${workDate}`, {
+        method: 'DELETE',
+        headers: {
+          apikey: SUPABASE_KEY,
+          Authorization: `Bearer ${SUPABASE_KEY}`,
+        },
+      });
+      await fetch(`${SUPABASE_URL}/rest/v1/route_detail?work_date=eq.${workDate}`, {
+        method: 'DELETE',
+        headers: {
+          apikey: SUPABASE_KEY,
+          Authorization: `Bearer ${SUPABASE_KEY}`,
+        },
+      });
 
-      // 2) 새 데이터 삽입 (그날 실제 배송량 = Trip2 있으면 Trip2, 없으면 Trip1)
+      // 2-1) 사람별 총합 삽입
       const rows = workers.map(([worker, data]) => ({
         work_date: workDate,
-        worker_name: worker, // 원래 이름으로 저장 (집계 정확성)
+        worker_name: worker,
         volume: hasTrip2 ? data.trip2 : data.trip1,
       }));
 
@@ -218,7 +243,38 @@ export default function SmartTripAnalyzer() {
         body: JSON.stringify(rows),
       });
 
-      if (res.ok) {
+      // 2-2) 노선별 상세 삽입 (검색용)
+      const routeRows: any[] = [];
+      workers.forEach(([worker, data]) => {
+        data.routes.forEach((r: any) => {
+          const vol = hasTrip2 ? r.trip2 : r.trip1;
+          if (vol > 0) {
+            routeRows.push({
+              work_date: workDate,
+              worker_name: worker,
+              route: r.route,
+              volume: vol,
+            });
+          }
+        });
+      });
+
+      let res2ok = true;
+      if (routeRows.length > 0) {
+        const res2 = await fetch(`${SUPABASE_URL}/rest/v1/route_detail`, {
+          method: 'POST',
+          headers: {
+            apikey: SUPABASE_KEY,
+            Authorization: `Bearer ${SUPABASE_KEY}`,
+            'Content-Type': 'application/json',
+            Prefer: 'return=minimal',
+          },
+          body: JSON.stringify(routeRows),
+        });
+        res2ok = res2.ok;
+      }
+
+      if (res.ok && res2ok) {
         setSaveStatus('saved');
       } else {
         setSaveStatus('error');
@@ -275,6 +331,137 @@ export default function SmartTripAnalyzer() {
       setMonthlyData({ error: true });
     }
     setMonthlyLoading(false);
+  };
+
+  // ===== 빠른 기간 설정 =====
+  const setPeriodThisMonth = () => {
+    const p = getBillingPeriod(todayStr);
+    setSearchStart(p.start);
+    setSearchEnd(p.end);
+  };
+  const setPeriodLastMonth = () => {
+    // 이번 정산월 시작 하루 전 = 지난 정산월에 속함
+    const thisP = getBillingPeriod(todayStr);
+    const before = new Date(thisP.start + 'T00:00:00');
+    before.setDate(before.getDate() - 1);
+    const beforeStr = `${before.getFullYear()}-${String(before.getMonth() + 1).padStart(2, '0')}-${String(before.getDate()).padStart(2, '0')}`;
+    const p = getBillingPeriod(beforeStr);
+    setSearchStart(p.start);
+    setSearchEnd(p.end);
+  };
+
+  // ===== 인원별 검색: 기간 내 사람별 합계 + 각자 노선 상세 =====
+  const searchByWorker = async () => {
+    if (!searchStart || !searchEnd) {
+      alert('⚠️ 검색 기간을 선택해주세요.');
+      return;
+    }
+    setSearchLoading(true);
+    setWorkerSearchResult(null);
+    try {
+      const res = await fetch(
+        `${SUPABASE_URL}/rest/v1/route_detail?work_date=gte.${searchStart}&work_date=lte.${searchEnd}&select=worker_name,route,volume,work_date`,
+        {
+          headers: {
+            apikey: SUPABASE_KEY,
+            Authorization: `Bearer ${SUPABASE_KEY}`,
+          },
+        }
+      );
+      if (!res.ok) {
+        setWorkerSearchResult({ error: true });
+        setSearchLoading(false);
+        return;
+      }
+      const rows: { worker_name: string; route: string; volume: number; work_date: string }[] =
+        await res.json();
+
+      // 사람별로 묶기
+      const byWorker: Record<string, { total: number; routes: Record<string, number>; days: Set<string> }> = {};
+      rows.forEach((r) => {
+        if (!byWorker[r.worker_name]) {
+          byWorker[r.worker_name] = { total: 0, routes: {}, days: new Set() };
+        }
+        byWorker[r.worker_name].total += r.volume || 0;
+        byWorker[r.worker_name].routes[r.route] =
+          (byWorker[r.worker_name].routes[r.route] || 0) + (r.volume || 0);
+        byWorker[r.worker_name].days.add(r.work_date);
+      });
+
+      const workers = Object.entries(byWorker)
+        .map(([name, d]) => ({
+          name,
+          total: d.total,
+          days: d.days.size,
+          routes: Object.entries(d.routes)
+            .map(([route, vol]) => ({ route, vol }))
+            .sort((a, b) => b.vol - a.vol),
+        }))
+        .sort((a, b) => b.total - a.total);
+
+      const grandTotal = workers.reduce((a, b) => a + b.total, 0);
+      setWorkerSearchResult({ workers, grandTotal, start: searchStart, end: searchEnd });
+    } catch {
+      setWorkerSearchResult({ error: true });
+    }
+    setSearchLoading(false);
+  };
+
+  // ===== 노선별 검색: 기간 내 노선별 합계 + 누가 했는지 =====
+  const searchByRoute = async () => {
+    if (!searchStart || !searchEnd) {
+      alert('⚠️ 검색 기간을 선택해주세요.');
+      return;
+    }
+    setSearchLoading(true);
+    setRouteSearchResult(null);
+    try {
+      const res = await fetch(
+        `${SUPABASE_URL}/rest/v1/route_detail?work_date=gte.${searchStart}&work_date=lte.${searchEnd}&select=worker_name,route,volume,work_date`,
+        {
+          headers: {
+            apikey: SUPABASE_KEY,
+            Authorization: `Bearer ${SUPABASE_KEY}`,
+          },
+        }
+      );
+      if (!res.ok) {
+        setRouteSearchResult({ error: true });
+        setSearchLoading(false);
+        return;
+      }
+      const rows: { worker_name: string; route: string; volume: number; work_date: string }[] =
+        await res.json();
+
+      // 노선별로 묶기
+      const byRoute: Record<string, { total: number; workers: Record<string, number>; days: Set<string> }> = {};
+      rows.forEach((r) => {
+        if (!byRoute[r.route]) {
+          byRoute[r.route] = { total: 0, workers: {}, days: new Set() };
+        }
+        byRoute[r.route].total += r.volume || 0;
+        byRoute[r.route].workers[r.worker_name] =
+          (byRoute[r.route].workers[r.worker_name] || 0) + (r.volume || 0);
+        byRoute[r.route].days.add(r.work_date);
+      });
+
+      const routes = Object.entries(byRoute)
+        .map(([route, d]) => ({
+          route,
+          total: d.total,
+          days: d.days.size,
+          workers: Object.entries(d.workers)
+            .map(([name, vol]) => ({ name, vol }))
+            .sort((a, b) => b.vol - a.vol),
+        }))
+        .sort((a, b) => a.route.localeCompare(b.route)); // 노선코드 순 정렬
+
+      const grandTotal = routes.reduce((a, b) => a + b.total, 0);
+      setRouteSearchResult({ routes, grandTotal, start: searchStart, end: searchEnd });
+    } catch {
+      setRouteSearchResult({ error: true });
+    }
+    setSearchLoading(false);
   };
 
   const analyze = () => {
@@ -621,6 +808,99 @@ export default function SmartTripAnalyzer() {
         }
         .st-btn-reset:hover { border-color: rgba(201,162,39,0.5); color: #d8c98f; }
 
+        /* 탭 메뉴 */
+        .st-tabs {
+          display: flex;
+          justify-content: center;
+          gap: 0.5rem;
+          margin-bottom: 2.5rem;
+          flex-wrap: wrap;
+          border-bottom: 2px solid rgba(201,162,39,0.25);
+          padding-bottom: 0;
+        }
+        .st-tab {
+          background: transparent;
+          border: none;
+          color: #8a8a82;
+          font-family: 'Noto Sans KR', sans-serif;
+          font-size: 1rem;
+          font-weight: 700;
+          padding: 0.9rem 1.4rem;
+          cursor: pointer;
+          position: relative;
+          transition: color 0.2s;
+          border-bottom: 3px solid transparent;
+          margin-bottom: -2px;
+        }
+        .st-tab:hover { color: #d8c98f; }
+        .st-tab.active {
+          color: #e8d48f;
+          border-bottom-color: #c9a227;
+        }
+
+        /* 검색 영역 */
+        .st-search-box {
+          background: #141414;
+          border: 2px solid rgba(201,162,39,0.35);
+          border-radius: 18px;
+          padding: 1.5rem;
+          margin-bottom: 2rem;
+        }
+        .st-search-title {
+          font-size: 1.2rem; font-weight: 700; color: #f5f4ef;
+          margin-bottom: 1.2rem; display: flex; align-items: center; gap: 0.6rem;
+        }
+        .st-date-row {
+          display: flex; gap: 0.8rem; align-items: center;
+          flex-wrap: wrap; margin-bottom: 1rem;
+        }
+        .st-date-input {
+          background: #0d0d0d;
+          border: 1px solid rgba(201,162,39,0.3);
+          border-radius: 10px;
+          color: #f5f4ef;
+          padding: 0.7rem 0.9rem;
+          font-size: 0.95rem;
+          font-family: 'Noto Sans KR', sans-serif;
+          outline: none;
+          color-scheme: dark;
+        }
+        .st-date-input:focus { border-color: #c9a227; }
+        .st-date-label { color: #8a8a82; font-size: 0.9rem; }
+        .st-quick-btns { display: flex; gap: 0.5rem; flex-wrap: wrap; margin-bottom: 1.2rem; }
+        .st-quick-btn {
+          background: rgba(201,162,39,0.1);
+          border: 1px solid rgba(201,162,39,0.3);
+          border-radius: 8px;
+          color: #d8c98f;
+          font-size: 0.85rem;
+          font-weight: 600;
+          padding: 0.5rem 1rem;
+          cursor: pointer;
+          transition: all 0.2s;
+        }
+        .st-quick-btn:hover { background: rgba(201,162,39,0.2); }
+        .st-search-btn {
+          background: linear-gradient(135deg, #c9a227, #e8d48f);
+          color: #1a1407;
+          font-weight: 900;
+          font-size: 1.05rem;
+          padding: 0.9rem 2rem;
+          border-radius: 12px;
+          border: none;
+          cursor: pointer;
+          width: 100%;
+          transition: all 0.3s;
+        }
+        .st-search-btn:hover { box-shadow: 0 8px 25px rgba(201,162,39,0.3); }
+
+        /* 검색 결과 카드 (노선 상세 펼침) */
+        .st-detail-routes {
+          margin-top: 0.9rem; padding-top: 0.9rem;
+          border-top: 1px solid rgba(255,255,255,0.05);
+          display: flex; flex-wrap: wrap; gap: 0.45rem;
+        }
+
         /* 결과 헤더 */
         .st-result-head { text-align: center; margin-bottom: 2rem; }
         .st-rh-company { font-size: 0.85rem; letter-spacing: 2px; color: #8a8a82; margin-bottom: 0.4rem; }
@@ -737,6 +1017,31 @@ export default function SmartTripAnalyzer() {
           <div className="st-tagline">캠도 물량 자동 분석</div>
         </div>
 
+        {/* ===== 탭 메뉴 ===== */}
+        <div className="st-tabs">
+          <button
+            className={'st-tab' + (activeTab === 'analyze' ? ' active' : '')}
+            onClick={() => setActiveTab('analyze')}
+          >
+            📊 오늘 분석
+          </button>
+          <button
+            className={'st-tab' + (activeTab === 'worker' ? ' active' : '')}
+            onClick={() => setActiveTab('worker')}
+          >
+            👥 인원별 검색
+          </button>
+          <button
+            className={'st-tab' + (activeTab === 'route' ? ' active' : '')}
+            onClick={() => setActiveTab('route')}
+          >
+            🛣️ 노선별 검색
+          </button>
+        </div>
+
+        {/* ===== 탭 1: 오늘 분석 ===== */}
+        {activeTab === 'analyze' && (
+        <div>
         {/* ✅ 입력 초기화 버튼을 입력 카드 위로 */}
         <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '1rem' }}>
           <button className="st-btn-reset" onClick={resetInputs}>
@@ -1093,6 +1398,227 @@ export default function SmartTripAnalyzer() {
                 </div>
               )}
             </div>
+          </div>
+        )}
+        </div>
+        )}
+
+        {/* ===== 탭 2: 인원별 검색 ===== */}
+        {activeTab === 'worker' && (
+          <div>
+            <div className="st-search-box">
+              <div className="st-search-title">
+                <span>👥</span>
+                <span>인원별 검색</span>
+              </div>
+              <div className="st-quick-btns">
+                <button className="st-quick-btn" onClick={setPeriodThisMonth}>이번 달 정산</button>
+                <button className="st-quick-btn" onClick={setPeriodLastMonth}>지난 달 정산</button>
+              </div>
+              <div className="st-date-row">
+                <input
+                  type="date"
+                  className="st-date-input"
+                  value={searchStart}
+                  onChange={(e) => setSearchStart(e.target.value)}
+                />
+                <span className="st-date-label">~</span>
+                <input
+                  type="date"
+                  className="st-date-input"
+                  value={searchEnd}
+                  onChange={(e) => setSearchEnd(e.target.value)}
+                />
+              </div>
+              <button className="st-search-btn" onClick={searchByWorker}>
+                🔍 검색
+              </button>
+            </div>
+
+            {searchLoading && (
+              <div style={{ textAlign: 'center', color: '#8a8a82', padding: '2rem' }}>
+                검색 중...
+              </div>
+            )}
+
+            {!searchLoading && workerSearchResult && workerSearchResult.error && (
+              <div
+                style={{
+                  textAlign: 'center', color: '#e89a82', padding: '1.5rem',
+                  background: 'rgba(180,60,40,0.1)', border: '1px solid rgba(180,60,40,0.3)',
+                  borderRadius: '12px',
+                }}
+              >
+                ⚠️ 검색에 실패했습니다. 인터넷 연결을 확인해주세요.
+              </div>
+            )}
+
+            {!searchLoading && workerSearchResult && !workerSearchResult.error && (
+              <div>
+                <div style={{ textAlign: 'center', marginBottom: '1.5rem' }}>
+                  <div style={{ fontSize: '0.85rem', color: '#8a8a82' }}>
+                    {workerSearchResult.start} ~ {workerSearchResult.end}
+                  </div>
+                  <div
+                    style={{
+                      fontFamily: "'Cormorant Garamond', serif",
+                      fontSize: '2.2rem', fontWeight: 600, color: '#e8d48f',
+                      fontVariantNumeric: 'tabular-nums',
+                    }}
+                  >
+                    총 {workerSearchResult.grandTotal.toLocaleString()}
+                  </div>
+                </div>
+
+                {workerSearchResult.workers.length === 0 ? (
+                  <div style={{ textAlign: 'center', color: '#8a8a82', padding: '2rem' }}>
+                    이 기간에 저장된 데이터가 없습니다.
+                  </div>
+                ) : (
+                  <div className="st-ranks">
+                    {workerSearchResult.workers.map((w: any, idx: number) => {
+                      const badgeClass =
+                        idx === 0 ? 'badge-1' : idx === 1 ? 'badge-2' : idx === 2 ? 'badge-3' : 'badge-n';
+                      const topVol = workerSearchResult.workers[0].total || 1;
+                      const barW = Math.max(5, (w.total / topVol) * 100);
+                      return (
+                        <div key={w.name} className={'st-rank-card' + (idx < 3 ? ' top' : '')}>
+                          <div className="st-rank-row">
+                            <div className={'st-rank-badge ' + badgeClass}>{idx + 1}</div>
+                            <div className="st-rank-name">
+                              {w.name === '김대원' ? (
+                                <>대원<span style={{ color: '#c9a227' }}>♡</span>빛나</>
+                              ) : (
+                                w.name
+                              )}
+                              <span style={{ fontSize: '0.8rem', color: '#8a8a82', fontWeight: 400, marginLeft: '0.6rem' }}>
+                                {w.days}일
+                              </span>
+                            </div>
+                            <div className="st-rank-vol">{w.total.toLocaleString()}</div>
+                          </div>
+                          <div className="st-bar-track">
+                            <div className="st-bar-fill" style={{ width: barW + '%' }} />
+                          </div>
+                          <div className="st-detail-routes">
+                            {w.routes.map((r: any) => (
+                              <span key={r.route} className="st-chip">
+                                {r.route}
+                                <b>{r.vol.toLocaleString()}</b>
+                              </span>
+                            ))}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* ===== 탭 3: 노선별 검색 ===== */}
+        {activeTab === 'route' && (
+          <div>
+            <div className="st-search-box">
+              <div className="st-search-title">
+                <span>🛣️</span>
+                <span>노선별 검색</span>
+              </div>
+              <div className="st-quick-btns">
+                <button className="st-quick-btn" onClick={setPeriodThisMonth}>이번 달 정산</button>
+                <button className="st-quick-btn" onClick={setPeriodLastMonth}>지난 달 정산</button>
+              </div>
+              <div className="st-date-row">
+                <input
+                  type="date"
+                  className="st-date-input"
+                  value={searchStart}
+                  onChange={(e) => setSearchStart(e.target.value)}
+                />
+                <span className="st-date-label">~</span>
+                <input
+                  type="date"
+                  className="st-date-input"
+                  value={searchEnd}
+                  onChange={(e) => setSearchEnd(e.target.value)}
+                />
+              </div>
+              <button className="st-search-btn" onClick={searchByRoute}>
+                🔍 검색
+              </button>
+            </div>
+
+            {searchLoading && (
+              <div style={{ textAlign: 'center', color: '#8a8a82', padding: '2rem' }}>
+                검색 중...
+              </div>
+            )}
+
+            {!searchLoading && routeSearchResult && routeSearchResult.error && (
+              <div
+                style={{
+                  textAlign: 'center', color: '#e89a82', padding: '1.5rem',
+                  background: 'rgba(180,60,40,0.1)', border: '1px solid rgba(180,60,40,0.3)',
+                  borderRadius: '12px',
+                }}
+              >
+                ⚠️ 검색에 실패했습니다. 인터넷 연결을 확인해주세요.
+              </div>
+            )}
+
+            {!searchLoading && routeSearchResult && !routeSearchResult.error && (
+              <div>
+                <div style={{ textAlign: 'center', marginBottom: '1.5rem' }}>
+                  <div style={{ fontSize: '0.85rem', color: '#8a8a82' }}>
+                    {routeSearchResult.start} ~ {routeSearchResult.end}
+                  </div>
+                  <div
+                    style={{
+                      fontFamily: "'Cormorant Garamond', serif",
+                      fontSize: '2.2rem', fontWeight: 600, color: '#e8d48f',
+                      fontVariantNumeric: 'tabular-nums',
+                    }}
+                  >
+                    총 {routeSearchResult.grandTotal.toLocaleString()}
+                  </div>
+                </div>
+
+                {routeSearchResult.routes.length === 0 ? (
+                  <div style={{ textAlign: 'center', color: '#8a8a82', padding: '2rem' }}>
+                    이 기간에 저장된 데이터가 없습니다.
+                  </div>
+                ) : (
+                  <div className="st-ranks">
+                    {routeSearchResult.routes.map((r: any) => (
+                      <div key={r.route} className="st-rank-card">
+                        <div className="st-rank-row">
+                          <div
+                            className="st-rank-name"
+                            style={{ fontFamily: "'Courier New', monospace", fontSize: '1.3rem' }}
+                          >
+                            {r.route}
+                            <span style={{ fontSize: '0.8rem', color: '#8a8a82', fontWeight: 400, marginLeft: '0.6rem' }}>
+                              {r.days}일
+                            </span>
+                          </div>
+                          <div className="st-rank-vol">{r.total.toLocaleString()}</div>
+                        </div>
+                        <div className="st-detail-routes">
+                          {r.workers.map((w: any) => (
+                            <span key={w.name} className="st-chip">
+                              {w.name === '김대원' ? '대원♡빛나' : w.name}
+                              <b>{w.vol.toLocaleString()}</b>
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         )}
       </div>
