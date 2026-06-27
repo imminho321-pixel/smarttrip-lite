@@ -2,6 +2,39 @@
 
 import { useState, useEffect } from 'react';
 
+// ===== Supabase 연결 설정 =====
+const SUPABASE_URL = 'https://wavnjbrxlfbzoyfnvitn.supabase.co';
+const SUPABASE_KEY = 'sb_publishable_DssDmObagqPE8p6XLNaxcw_ufdr_ZeG';
+
+// 정산 기간 계산: 어떤 날짜가 속한 26일~다음달25일 기간 반환
+function getBillingPeriod(dateStr: string) {
+  const d = new Date(dateStr + 'T00:00:00');
+  const year = d.getFullYear();
+  const month = d.getMonth();
+  const day = d.getDate();
+  let startYear: number, startMonth: number;
+  if (day >= 26) {
+    startYear = year;
+    startMonth = month;
+  } else {
+    startYear = month === 0 ? year - 1 : year;
+    startMonth = month === 0 ? 11 : month - 1;
+  }
+  const start = new Date(startYear, startMonth, 26);
+  const end = new Date(startYear, startMonth + 1, 25);
+  const fmt = (dt: Date) => {
+    const y = dt.getFullYear();
+    const m = String(dt.getMonth() + 1).padStart(2, '0');
+    const dd = String(dt.getDate()).padStart(2, '0');
+    return `${y}-${m}-${dd}`;
+  };
+  return {
+    start: fmt(start),
+    end: fmt(end),
+    label: `${startYear}년 ${startMonth + 1}월 정산`,
+  };
+}
+
 export default function SmartTripAnalyzer() {
   const [trip1Data, setTrip1Data] = useState('');
   const [trip2Data, setTrip2Data] = useState('');
@@ -9,6 +42,11 @@ export default function SmartTripAnalyzer() {
   const [targetDate, setTargetDate] = useState('');
   const [result, setResult] = useState<any>(null);
   const [loaded, setLoaded] = useState(false);
+
+  // 월간 누적 합계 상태
+  const [monthlyData, setMonthlyData] = useState<any>(null);
+  const [monthlyLoading, setMonthlyLoading] = useState(false);
+  const [saveStatus, setSaveStatus] = useState<string>('');
 
   // ✅ 이름 표시 변환 (화면에만 적용, 복사는 원래 이름 유지)
   const displayName = (name: string) => {
@@ -142,6 +180,103 @@ export default function SmartTripAnalyzer() {
     return subRoutes.size > 0 ? Array.from(subRoutes).sort() : [route];
   };
 
+  // ===== Supabase: 그날 사람별 물량 저장 (날짜 기준 덮어쓰기) =====
+  const saveToCloud = async (
+    workDate: string,
+    workers: [string, any][],
+    hasTrip2: boolean
+  ) => {
+    setSaveStatus('saving');
+    try {
+      // 1) 같은 날짜 기존 데이터 먼저 삭제 (덮어쓰기 = 중복 방지)
+      await fetch(
+        `${SUPABASE_URL}/rest/v1/daily_volume?work_date=eq.${workDate}`,
+        {
+          method: 'DELETE',
+          headers: {
+            apikey: SUPABASE_KEY,
+            Authorization: `Bearer ${SUPABASE_KEY}`,
+          },
+        }
+      );
+
+      // 2) 새 데이터 삽입 (그날 실제 배송량 = Trip2 있으면 Trip2, 없으면 Trip1)
+      const rows = workers.map(([worker, data]) => ({
+        work_date: workDate,
+        worker_name: worker, // 원래 이름으로 저장 (집계 정확성)
+        volume: hasTrip2 ? data.trip2 : data.trip1,
+      }));
+
+      const res = await fetch(`${SUPABASE_URL}/rest/v1/daily_volume`, {
+        method: 'POST',
+        headers: {
+          apikey: SUPABASE_KEY,
+          Authorization: `Bearer ${SUPABASE_KEY}`,
+          'Content-Type': 'application/json',
+          Prefer: 'return=minimal',
+        },
+        body: JSON.stringify(rows),
+      });
+
+      if (res.ok) {
+        setSaveStatus('saved');
+      } else {
+        setSaveStatus('error');
+      }
+    } catch {
+      setSaveStatus('error');
+    }
+  };
+
+  // ===== Supabase: 해당 정산월(26~25일) 사람별 누적 합계 불러오기 =====
+  const loadMonthly = async (workDate: string) => {
+    setMonthlyLoading(true);
+    try {
+      const period = getBillingPeriod(workDate);
+      const res = await fetch(
+        `${SUPABASE_URL}/rest/v1/daily_volume?work_date=gte.${period.start}&work_date=lte.${period.end}&select=worker_name,volume,work_date`,
+        {
+          headers: {
+            apikey: SUPABASE_KEY,
+            Authorization: `Bearer ${SUPABASE_KEY}`,
+          },
+        }
+      );
+      if (!res.ok) {
+        setMonthlyData({ error: true, period });
+        setMonthlyLoading(false);
+        return;
+      }
+      const rows: { worker_name: string; volume: number; work_date: string }[] =
+        await res.json();
+
+      // 사람별 합산
+      const totals: Record<string, number> = {};
+      const dayCount: Record<string, Set<string>> = {};
+      rows.forEach((r) => {
+        totals[r.worker_name] = (totals[r.worker_name] || 0) + (r.volume || 0);
+        if (!dayCount[r.worker_name]) dayCount[r.worker_name] = new Set();
+        dayCount[r.worker_name].add(r.work_date);
+      });
+
+      const sorted = Object.entries(totals)
+        .map(([name, total]) => ({
+          name,
+          total,
+          days: dayCount[name] ? dayCount[name].size : 0,
+        }))
+        .sort((a, b) => b.total - a.total);
+
+      const grandTotal = sorted.reduce((a, b) => a + b.total, 0);
+      const workDays = new Set(rows.map((r) => r.work_date)).size;
+
+      setMonthlyData({ period, workers: sorted, grandTotal, workDays });
+    } catch {
+      setMonthlyData({ error: true });
+    }
+    setMonthlyLoading(false);
+  };
+
   const analyze = () => {
     // 1) 빈 입력 체크
     if (!scheduleData.trim() && !trip1Data.trim()) {
@@ -258,6 +393,17 @@ export default function SmartTripAnalyzer() {
       unassigned,
       recognizedCount: allVolumeRoutes.size,
     });
+
+    // ✅ 클라우드에 저장 + 월간 누적 불러오기
+    const hasTrip2ForSave = totalTrip2 > 0;
+    saveToCloud(scheduleDate, sorted as [string, any][], hasTrip2ForSave).then(() => {
+      loadMonthly(scheduleDate);
+    });
+  };
+
+  // 월간 합계만 다시 불러오기 (저장 없이 조회만)
+  const refreshMonthly = () => {
+    if (targetDate) loadMonthly(targetDate);
   };
 
   const copyToClipboard = () => {
@@ -779,6 +925,173 @@ export default function SmartTripAnalyzer() {
                   </div>
                 );
               })}
+            </div>
+
+            {/* ===== 월간 누적 합계 (26일~25일) ===== */}
+            <div style={{ marginTop: '3rem' }}>
+              <div
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '0.8rem',
+                  marginBottom: '1.5rem',
+                }}
+              >
+                <div className="st-section-title" style={{ margin: 0 }}>
+                  — 월간 누적 합계 —
+                </div>
+                <button
+                  onClick={refreshMonthly}
+                  title="새로고침"
+                  style={{
+                    background: 'transparent',
+                    border: '1px solid rgba(201,162,39,0.3)',
+                    borderRadius: '8px',
+                    color: '#c9a227',
+                    cursor: 'pointer',
+                    padding: '0.3rem 0.6rem',
+                    fontSize: '0.85rem',
+                  }}
+                >
+                  ↻
+                </button>
+              </div>
+
+              {monthlyLoading && (
+                <div style={{ textAlign: 'center', color: '#8a8a82', padding: '1.5rem' }}>
+                  불러오는 중...
+                </div>
+              )}
+
+              {!monthlyLoading && monthlyData && monthlyData.error && (
+                <div
+                  style={{
+                    textAlign: 'center',
+                    color: '#e89a82',
+                    padding: '1.5rem',
+                    background: 'rgba(180,60,40,0.1)',
+                    border: '1px solid rgba(180,60,40,0.3)',
+                    borderRadius: '12px',
+                  }}
+                >
+                  ⚠️ 누적 데이터를 불러오지 못했습니다. 인터넷 연결을 확인하고 ↻ 버튼을 눌러주세요.
+                </div>
+              )}
+
+              {!monthlyLoading && monthlyData && !monthlyData.error && (
+                <div>
+                  {/* 정산 기간 + 저장 상태 */}
+                  <div
+                    style={{
+                      textAlign: 'center',
+                      marginBottom: '1.2rem',
+                    }}
+                  >
+                    <div
+                      style={{
+                        fontFamily: "'Cormorant Garamond', serif",
+                        fontSize: '1.5rem',
+                        fontWeight: 600,
+                        color: '#e8d48f',
+                      }}
+                    >
+                      {monthlyData.period.label}
+                    </div>
+                    <div style={{ fontSize: '0.8rem', color: '#8a8a82', marginTop: '0.3rem' }}>
+                      {monthlyData.period.start} ~ {monthlyData.period.end} · 누적 {monthlyData.workDays}일
+                    </div>
+                    {saveStatus === 'saving' && (
+                      <div style={{ fontSize: '0.78rem', color: '#8a8a82', marginTop: '0.4rem' }}>
+                        ☁️ 저장 중...
+                      </div>
+                    )}
+                    {saveStatus === 'saved' && (
+                      <div style={{ fontSize: '0.78rem', color: '#9aca7a', marginTop: '0.4rem' }}>
+                        ✓ 오늘 데이터 저장됨 (모든 기기에 공유)
+                      </div>
+                    )}
+                    {saveStatus === 'error' && (
+                      <div style={{ fontSize: '0.78rem', color: '#e89a82', marginTop: '0.4rem' }}>
+                        ⚠️ 저장 실패 (인터넷 확인)
+                      </div>
+                    )}
+                  </div>
+
+                  {/* 월간 총합 */}
+                  <div
+                    style={{
+                      background: 'linear-gradient(135deg, rgba(201,162,39,0.12), #141414 70%)',
+                      border: '2px solid rgba(201,162,39,0.35)',
+                      borderRadius: '16px',
+                      padding: '1.2rem',
+                      textAlign: 'center',
+                      marginBottom: '1.5rem',
+                    }}
+                  >
+                    <div style={{ fontSize: '0.75rem', letterSpacing: '2px', color: '#8a8a82' }}>
+                      이번 달 총 배송수량
+                    </div>
+                    <div
+                      style={{
+                        fontFamily: "'Cormorant Garamond', serif",
+                        fontSize: '2.6rem',
+                        fontWeight: 600,
+                        color: '#e8d48f',
+                        fontVariantNumeric: 'tabular-nums',
+                      }}
+                    >
+                      {monthlyData.grandTotal.toLocaleString()}
+                    </div>
+                  </div>
+
+                  {/* 사람별 누적 리스트 */}
+                  {monthlyData.workers.length === 0 ? (
+                    <div style={{ textAlign: 'center', color: '#8a8a82', padding: '1rem' }}>
+                      아직 이번 달 데이터가 없습니다.
+                    </div>
+                  ) : (
+                    <div className="st-ranks">
+                      {monthlyData.workers.map((w: any, idx: number) => {
+                        const badgeClass =
+                          idx === 0 ? 'badge-1' : idx === 1 ? 'badge-2' : idx === 2 ? 'badge-3' : 'badge-n';
+                        const topVol = monthlyData.workers[0].total || 1;
+                        const barW = Math.max(5, (w.total / topVol) * 100);
+                        return (
+                          <div key={w.name} className={'st-rank-card' + (idx < 3 ? ' top' : '')}>
+                            <div className="st-rank-row">
+                              <div className={'st-rank-badge ' + badgeClass}>{idx + 1}</div>
+                              <div className="st-rank-name">
+                                {w.name === '김대원' ? (
+                                  <>
+                                    대원<span style={{ color: '#c9a227' }}>♡</span>빛나
+                                  </>
+                                ) : (
+                                  w.name
+                                )}
+                                <span
+                                  style={{
+                                    fontSize: '0.8rem',
+                                    color: '#8a8a82',
+                                    fontWeight: 400,
+                                    marginLeft: '0.6rem',
+                                  }}
+                                >
+                                  {w.days}일
+                                </span>
+                              </div>
+                              <div className="st-rank-vol">{w.total.toLocaleString()}</div>
+                            </div>
+                            <div className="st-bar-track">
+                              <div className="st-bar-fill" style={{ width: barW + '%' }} />
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           </div>
         )}
