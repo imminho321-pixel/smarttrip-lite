@@ -52,8 +52,14 @@ export default function SmartTripAnalyzer() {
   const [shareStatus, setShareStatus] = useState<string>('');
   const [sharedInfo, setSharedInfo] = useState<{ by: string; at: string } | null>(null);
 
-  // 탭 상태: 'analyze' | 'worker' | 'route'
-  const [activeTab, setActiveTab] = useState<'analyze' | 'worker' | 'route'>('analyze');
+  // 탭 상태: 'analyze' | 'worker' | 'route' | 'delete'
+  const [activeTab, setActiveTab] = useState<'analyze' | 'worker' | 'route' | 'delete'>('analyze');
+
+  // 데이터 삭제 관련 상태
+  const [deleteDate, setDeleteDate] = useState('');
+  const [deletePreview, setDeletePreview] = useState<any>(null);
+  const [deleteLoading, setDeleteLoading] = useState(false);
+  const [deleteStatus, setDeleteStatus] = useState<string>('');
 
   // 검색 기간 (기본: 이번 정산월)
   const todayStr = (() => {
@@ -529,6 +535,74 @@ export default function SmartTripAnalyzer() {
       () => alert('✅ 복사 완료!'),
       () => alert('❌ 복사 실패')
     );
+  };
+
+  // ===== 특정 날짜 데이터 조회 (삭제 전 미리보기) =====
+  const previewDelete = async () => {
+    const d = deleteDate || todayStr;
+    setDeleteLoading(true);
+    setDeletePreview(null);
+    setDeleteStatus('');
+    try {
+      const res = await fetch(
+        `${SUPABASE_URL}/rest/v1/daily_volume?work_date=eq.${d}&select=worker_name,volume`,
+        {
+          headers: {
+            apikey: SUPABASE_KEY,
+            Authorization: `Bearer ${SUPABASE_KEY}`,
+          },
+        }
+      );
+      if (!res.ok) {
+        setDeletePreview({ error: true });
+        setDeleteLoading(false);
+        return;
+      }
+      const rows: { worker_name: string; volume: number }[] = await res.json();
+      if (rows.length === 0) {
+        setDeletePreview({ empty: true, date: d });
+      } else {
+        const total = rows.reduce((a, b) => a + (b.volume || 0), 0);
+        const workers = rows
+          .map((r) => ({ name: r.worker_name, volume: r.volume }))
+          .sort((a, b) => b.volume - a.volume);
+        setDeletePreview({ date: d, count: rows.length, total, workers });
+      }
+    } catch {
+      setDeletePreview({ error: true });
+    }
+    setDeleteLoading(false);
+  };
+
+  // ===== 특정 날짜 데이터 삭제 =====
+  const doDelete = async () => {
+    const d = deleteDate || todayStr;
+    if (!deletePreview || deletePreview.empty || deletePreview.error) return;
+    if (!confirm(`정말 ${d} 데이터를 삭제할까요?\n\n인원 ${deletePreview.count}명, 총 ${deletePreview.total.toLocaleString()}\n\n이 작업은 되돌릴 수 없습니다.`)) {
+      return;
+    }
+    setDeleteStatus('deleting');
+    try {
+      // 사람별 합계 + 노선별 상세 둘 다 삭제
+      await fetch(`${SUPABASE_URL}/rest/v1/daily_volume?work_date=eq.${d}`, {
+        method: 'DELETE',
+        headers: {
+          apikey: SUPABASE_KEY,
+          Authorization: `Bearer ${SUPABASE_KEY}`,
+        },
+      });
+      await fetch(`${SUPABASE_URL}/rest/v1/route_detail?work_date=eq.${d}`, {
+        method: 'DELETE',
+        headers: {
+          apikey: SUPABASE_KEY,
+          Authorization: `Bearer ${SUPABASE_KEY}`,
+        },
+      });
+      setDeleteStatus('deleted');
+      setDeletePreview(null);
+    } catch {
+      setDeleteStatus('error');
+    }
   };
 
   const analyze = () => {
@@ -1165,6 +1239,12 @@ export default function SmartTripAnalyzer() {
           >
             🛣️ 노선별 검색
           </button>
+          <button
+            className={'st-tab' + (activeTab === 'delete' ? ' active' : '')}
+            onClick={() => setActiveTab('delete')}
+          >
+            🗑️ 데이터 삭제
+          </button>
         </div>
 
         {/* ===== 탭 1: 오늘 분석 ===== */}
@@ -1789,6 +1869,164 @@ export default function SmartTripAnalyzer() {
                     ))}
                   </div>
                 )}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* ===== 탭 4: 데이터 삭제 ===== */}
+        {activeTab === 'delete' && (
+          <div>
+            <div className="st-search-box">
+              <div className="st-search-title">
+                <span>🗑️</span>
+                <span>데이터 삭제</span>
+              </div>
+              <div
+                style={{
+                  fontSize: '0.85rem',
+                  color: '#8a8a82',
+                  marginBottom: '1.2rem',
+                  lineHeight: 1.6,
+                }}
+              >
+                물량을 잘못 입력한 날이 있으면 여기서 삭제할 수 있습니다.
+                <br />
+                날짜를 고르고 <b style={{ color: '#d8c98f' }}>조회</b>로 내용을 확인한 뒤 삭제하세요.
+                <br />
+                <span style={{ color: '#d9a98f' }}>
+                  ※ 올바른 데이터가 있으면, 삭제 대신 그 날짜로 다시 분석하면 자동으로 덮어써집니다.
+                </span>
+              </div>
+              <div className="st-date-row">
+                <span className="st-date-label">날짜</span>
+                <input
+                  type="date"
+                  className="st-date-input"
+                  value={deleteDate || todayStr}
+                  onChange={(e) => {
+                    setDeleteDate(e.target.value);
+                    setDeletePreview(null);
+                    setDeleteStatus('');
+                  }}
+                />
+              </div>
+              <button className="st-search-btn" onClick={previewDelete}>
+                🔍 조회
+              </button>
+            </div>
+
+            {deleteLoading && (
+              <div style={{ textAlign: 'center', color: '#8a8a82', padding: '2rem' }}>
+                조회 중...
+              </div>
+            )}
+
+            {!deleteLoading && deletePreview && deletePreview.error && (
+              <div
+                style={{
+                  textAlign: 'center', color: '#e89a82', padding: '1.5rem',
+                  background: 'rgba(180,60,40,0.1)', border: '1px solid rgba(180,60,40,0.3)',
+                  borderRadius: '12px',
+                }}
+              >
+                ⚠️ 조회에 실패했습니다. 인터넷 연결을 확인해주세요.
+              </div>
+            )}
+
+            {!deleteLoading && deletePreview && deletePreview.empty && (
+              <div style={{ textAlign: 'center', color: '#8a8a82', padding: '2rem' }}>
+                📭 {deletePreview.date}에 저장된 데이터가 없습니다.
+              </div>
+            )}
+
+            {!deleteLoading && deletePreview && !deletePreview.error && !deletePreview.empty && (
+              <div>
+                <div
+                  style={{
+                    background: 'linear-gradient(135deg, rgba(180,60,40,0.12), #141414 70%)',
+                    border: '2px solid rgba(180,60,40,0.4)',
+                    borderRadius: '16px',
+                    padding: '1.4rem',
+                    marginBottom: '1.5rem',
+                    textAlign: 'center',
+                  }}
+                >
+                  <div style={{ fontSize: '0.85rem', color: '#8a8a82' }}>{deletePreview.date}</div>
+                  <div
+                    style={{
+                      fontFamily: "'Cormorant Garamond', serif",
+                      fontSize: '2rem', fontWeight: 600, color: '#e8d48f',
+                      margin: '0.3rem 0',
+                    }}
+                  >
+                    {deletePreview.count}명 · 총 {deletePreview.total.toLocaleString()}
+                  </div>
+                  <button
+                    onClick={doDelete}
+                    style={{
+                      marginTop: '0.8rem',
+                      background: 'linear-gradient(135deg, #b91c1c, #dc2626)',
+                      color: 'white',
+                      fontWeight: 700,
+                      fontSize: '1rem',
+                      padding: '0.8rem 2rem',
+                      borderRadius: '12px',
+                      border: 'none',
+                      cursor: 'pointer',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '0.4rem',
+                    }}
+                  >
+                    <span>🗑️</span>
+                    <span>이 날짜 삭제</span>
+                  </button>
+                </div>
+
+                {/* 삭제 전 내용 미리보기 */}
+                <div className="st-ranks">
+                  {deletePreview.workers.map((w: any) => (
+                    <div key={w.name} className="st-rank-card" style={{ padding: '0.9rem 1.2rem' }}>
+                      <div className="st-rank-row">
+                        <div className="st-rank-name" style={{ fontSize: '1.1rem' }}>
+                          {w.name === '김대원' ? '대원♡빛나' : w.name}
+                        </div>
+                        <div className="st-rank-vol" style={{ fontSize: '1.4rem' }}>
+                          {w.volume.toLocaleString()}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {deleteStatus === 'deleting' && (
+              <div style={{ textAlign: 'center', color: '#8a8a82', padding: '1.5rem' }}>
+                삭제 중...
+              </div>
+            )}
+            {deleteStatus === 'deleted' && (
+              <div
+                style={{
+                  textAlign: 'center', color: '#9aca7a', padding: '1.5rem',
+                  background: 'rgba(120,180,80,0.1)', border: '1px solid rgba(120,180,80,0.3)',
+                  borderRadius: '12px', fontWeight: 700,
+                }}
+              >
+                ✓ 삭제 완료되었습니다. (월 누적·검색에서 빠집니다)
+              </div>
+            )}
+            {deleteStatus === 'error' && (
+              <div
+                style={{
+                  textAlign: 'center', color: '#e89a82', padding: '1.5rem',
+                  background: 'rgba(180,60,40,0.1)', border: '1px solid rgba(180,60,40,0.3)',
+                  borderRadius: '12px',
+                }}
+              >
+                ⚠️ 삭제에 실패했습니다. 다시 시도해주세요.
               </div>
             )}
           </div>
