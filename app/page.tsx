@@ -660,7 +660,7 @@ export default function SmartTripAnalyzer() {
     setDeleteStatus('');
     try {
       const res = await fetch(
-        `${SUPABASE_URL}/rest/v1/daily_volume?work_date=eq.${d}&select=worker_name,volume`,
+        `${SUPABASE_URL}/rest/v1/daily_volume?work_date=eq.${d}&select=worker_name,volume,trip`,
         {
           headers: {
             apikey: SUPABASE_KEY,
@@ -673,15 +673,38 @@ export default function SmartTripAnalyzer() {
         setDeleteLoading(false);
         return;
       }
-      const rows: { worker_name: string; volume: number }[] = await res.json();
+      const rows: { worker_name: string; volume: number; trip: number }[] = await res.json();
       if (rows.length === 0) {
         setDeletePreview({ empty: true, date: d });
       } else {
-        const total = rows.reduce((a, b) => a + (b.volume || 0), 0);
-        const workers = rows
-          .map((r) => ({ name: r.worker_name, volume: r.volume }))
+        // 1차/2차 분리 집계
+        const trip1Total = rows.filter((r) => r.trip === 1).reduce((a, b) => a + (b.volume || 0), 0);
+        const trip2Total = rows.filter((r) => r.trip === 2).reduce((a, b) => a + (b.volume || 0), 0);
+        const trip1Count = new Set(rows.filter((r) => r.trip === 1).map((r) => r.worker_name)).size;
+        const trip2Count = new Set(rows.filter((r) => r.trip === 2).map((r) => r.worker_name)).size;
+        const total = trip1Total + trip2Total;
+
+        // 사람별 합계 (1차+2차 합쳐서 표시)
+        const byWorker: Record<string, number> = {};
+        rows.forEach((r) => {
+          byWorker[r.worker_name] = (byWorker[r.worker_name] || 0) + (r.volume || 0);
+        });
+        const workers = Object.entries(byWorker)
+          .map(([name, volume]) => ({ name, volume }))
           .sort((a, b) => b.volume - a.volume);
-        setDeletePreview({ date: d, count: rows.length, total, workers });
+
+        setDeletePreview({
+          date: d,
+          count: workers.length,
+          total,
+          trip1Total,
+          trip2Total,
+          trip1Count,
+          trip2Count,
+          hasTrip1: trip1Total > 0,
+          hasTrip2: trip2Total > 0,
+          workers,
+        });
       }
     } catch {
       setDeletePreview({ error: true });
@@ -689,24 +712,32 @@ export default function SmartTripAnalyzer() {
     setDeleteLoading(false);
   };
 
-  // ===== 특정 날짜 데이터 삭제 =====
-  const doDelete = async () => {
+  // ===== 특정 날짜 데이터 삭제 (trip: 'all' | 1 | 2) =====
+  const doDelete = async (tripType: 'all' | 1 | 2) => {
     const d = deleteDate || todayStr;
     if (!deletePreview || deletePreview.empty || deletePreview.error) return;
-    if (!confirm(`정말 ${d} 데이터를 삭제할까요?\n\n인원 ${deletePreview.count}명, 총 ${deletePreview.total.toLocaleString()}\n\n이 작업은 되돌릴 수 없습니다.`)) {
+
+    let label = '';
+    if (tripType === 'all') label = '1차 + 2차 전체';
+    else if (tripType === 1) label = '1차만';
+    else label = '2차만';
+
+    if (!confirm(`정말 ${d}의 ${label} 데이터를 삭제할까요?\n\n이 작업은 되돌릴 수 없습니다.`)) {
       return;
     }
     setDeleteStatus('deleting');
     try {
-      // 사람별 합계 + 노선별 상세 둘 다 삭제
-      await fetch(`${SUPABASE_URL}/rest/v1/daily_volume?work_date=eq.${d}`, {
+      // trip 조건 만들기
+      const tripFilter = tripType === 'all' ? '' : `&trip=eq.${tripType}`;
+
+      await fetch(`${SUPABASE_URL}/rest/v1/daily_volume?work_date=eq.${d}${tripFilter}`, {
         method: 'DELETE',
         headers: {
           apikey: SUPABASE_KEY,
           Authorization: `Bearer ${SUPABASE_KEY}`,
         },
       });
-      await fetch(`${SUPABASE_URL}/rest/v1/route_detail?work_date=eq.${d}`, {
+      await fetch(`${SUPABASE_URL}/rest/v1/route_detail?work_date=eq.${d}${tripFilter}`, {
         method: 'DELETE',
         headers: {
           apikey: SUPABASE_KEY,
@@ -1855,6 +1886,27 @@ export default function SmartTripAnalyzer() {
                             <div className="st-bar-fill" style={{ width: barW + '%' }} />
                           </div>
 
+                          {/* 하루 평균 (1차+2차 완전한 날만) */}
+                          {w.avg !== null && (
+                            <div
+                              style={{
+                                marginTop: '0.7rem',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '0.5rem',
+                                fontSize: '0.85rem',
+                              }}
+                            >
+                              <span style={{ color: '#8a8a82' }}>📊 하루 평균</span>
+                              <span style={{ color: '#e8d48f', fontWeight: 800 }}>
+                                {w.avg.toLocaleString()}
+                              </span>
+                              <span style={{ color: '#6a6a62', fontSize: '0.78rem' }}>
+                                (1·2차 모두 있는 {w.avgDays}일 기준)
+                              </span>
+                            </div>
+                          )}
+
                           {/* 날짜별 상세 (클릭 시 펼쳐짐) */}
                           {isExpanded && w.dates && (
                             <div
@@ -2033,6 +2085,27 @@ export default function SmartTripAnalyzer() {
                             <div className="st-rank-vol">{r.total.toLocaleString()}</div>
                           </div>
 
+                          {/* 하루 평균 (1차+2차 완전한 날만) */}
+                          {r.avg !== null && (
+                            <div
+                              style={{
+                                marginTop: '0.7rem',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '0.5rem',
+                                fontSize: '0.85rem',
+                              }}
+                            >
+                              <span style={{ color: '#8a8a82' }}>📊 하루 평균</span>
+                              <span style={{ color: '#e8d48f', fontWeight: 800 }}>
+                                {r.avg.toLocaleString()}
+                              </span>
+                              <span style={{ color: '#6a6a62', fontSize: '0.78rem' }}>
+                                (1·2차 모두 있는 {r.avgDays}일 기준)
+                              </span>
+                            </div>
+                          )}
+
                           {/* 날짜별 상세 (클릭 시 펼쳐짐) */}
                           {isExpanded && r.dates && (
                             <div
@@ -2179,26 +2252,81 @@ export default function SmartTripAnalyzer() {
                   >
                     {deletePreview.count}명 · 총 {deletePreview.total.toLocaleString()}
                   </div>
-                  <button
-                    onClick={doDelete}
+
+                  {/* 1차/2차 분리 표시 */}
+                  <div
                     style={{
-                      marginTop: '0.8rem',
-                      background: 'linear-gradient(135deg, #b91c1c, #dc2626)',
-                      color: 'white',
-                      fontWeight: 700,
-                      fontSize: '1rem',
-                      padding: '0.8rem 2rem',
-                      borderRadius: '12px',
-                      border: 'none',
-                      cursor: 'pointer',
-                      display: 'inline-flex',
-                      alignItems: 'center',
-                      gap: '0.4rem',
+                      display: 'flex',
+                      justifyContent: 'center',
+                      gap: '1.5rem',
+                      margin: '0.8rem 0 1.2rem',
+                      fontSize: '0.9rem',
                     }}
                   >
-                    <span>🗑️</span>
-                    <span>이 날짜 삭제</span>
-                  </button>
+                    <span style={{ color: deletePreview.hasTrip1 ? '#d8d4c8' : '#5a5a55' }}>
+                      1차: <b style={{ color: deletePreview.hasTrip1 ? '#e8d48f' : '#5a5a55' }}>
+                        {deletePreview.hasTrip1 ? deletePreview.trip1Total.toLocaleString() : '없음'}
+                      </b>
+                    </span>
+                    <span style={{ color: deletePreview.hasTrip2 ? '#d8d4c8' : '#5a5a55' }}>
+                      2차: <b style={{ color: deletePreview.hasTrip2 ? '#e8d48f' : '#5a5a55' }}>
+                        {deletePreview.hasTrip2 ? deletePreview.trip2Total.toLocaleString() : '없음'}
+                      </b>
+                    </span>
+                  </div>
+
+                  {/* 삭제 버튼 3개 */}
+                  <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'center', flexWrap: 'wrap' }}>
+                    {deletePreview.hasTrip1 && (
+                      <button
+                        onClick={() => doDelete(1)}
+                        style={{
+                          background: 'rgba(180,60,40,0.15)',
+                          border: '1px solid rgba(220,80,60,0.5)',
+                          color: '#f0b89f',
+                          fontWeight: 700,
+                          fontSize: '0.9rem',
+                          padding: '0.7rem 1.2rem',
+                          borderRadius: '12px',
+                          cursor: 'pointer',
+                        }}
+                      >
+                        🗑️ 1차만 삭제
+                      </button>
+                    )}
+                    {deletePreview.hasTrip2 && (
+                      <button
+                        onClick={() => doDelete(2)}
+                        style={{
+                          background: 'rgba(180,60,40,0.15)',
+                          border: '1px solid rgba(220,80,60,0.5)',
+                          color: '#f0b89f',
+                          fontWeight: 700,
+                          fontSize: '0.9rem',
+                          padding: '0.7rem 1.2rem',
+                          borderRadius: '12px',
+                          cursor: 'pointer',
+                        }}
+                      >
+                        🗑️ 2차만 삭제
+                      </button>
+                    )}
+                    <button
+                      onClick={() => doDelete('all')}
+                      style={{
+                        background: 'linear-gradient(135deg, #b91c1c, #dc2626)',
+                        color: 'white',
+                        fontWeight: 700,
+                        fontSize: '0.9rem',
+                        padding: '0.7rem 1.4rem',
+                        borderRadius: '12px',
+                        border: 'none',
+                        cursor: 'pointer',
+                      }}
+                    >
+                      🗑️ 전체 삭제
+                    </button>
+                  </div>
                 </div>
 
                 {/* 삭제 전 내용 미리보기 */}
