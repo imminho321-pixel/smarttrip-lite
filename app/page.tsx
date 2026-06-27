@@ -225,11 +225,11 @@ export default function SmartTripAnalyzer() {
         },
       });
 
-      // 2-1) 사람별 총합 삽입
+      // 2-1) 사람별 총합 삽입 (1차+2차 합산 = 실제 배송 총량)
       const rows = workers.map(([worker, data]) => ({
         work_date: workDate,
         worker_name: worker,
-        volume: hasTrip2 ? data.trip2 : data.trip1,
+        volume: data.total, // trip1 + trip2 (1차만 한 사람은 1차만, 둘다면 합산)
       }));
 
       const res = await fetch(`${SUPABASE_URL}/rest/v1/daily_volume`, {
@@ -243,11 +243,11 @@ export default function SmartTripAnalyzer() {
         body: JSON.stringify(rows),
       });
 
-      // 2-2) 노선별 상세 삽입 (검색용)
+      // 2-2) 노선별 상세 삽입 (검색용, 1차+2차 합산)
       const routeRows: any[] = [];
       workers.forEach(([worker, data]) => {
         data.routes.forEach((r: any) => {
-          const vol = hasTrip2 ? r.trip2 : r.trip1;
+          const vol = (r.trip1 || 0) + (r.trip2 || 0); // 노선별도 1차+2차 합산
           if (vol > 0) {
             routeRows.push({
               work_date: workDate,
