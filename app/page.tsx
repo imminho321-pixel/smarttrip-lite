@@ -1037,83 +1037,88 @@ export default function SmartTripAnalyzer() {
 
         /* 헤더 */
         .st-header {
-          text-align: center;
-          padding: 3rem 1.5rem 3rem;
-          margin-bottom: 2.5rem;
           position: relative;
           border-radius: 24px;
           overflow: hidden;
-          background:
-            radial-gradient(ellipse 80% 60% at 50% 0%, rgba(201,162,39,0.15), transparent 70%),
-            radial-gradient(ellipse 60% 50% at 50% 100%, rgba(201,162,39,0.06), transparent 70%),
-            linear-gradient(180deg, #161310 0%, #0d0d0d 100%);
-          border: 1px solid rgba(201,162,39,0.2);
+          margin-bottom: 2.5rem;
+          border: 1px solid rgba(201,162,39,0.35);
+          min-height: 340px;
+          display: flex;
+          align-items: flex-end;
+          box-shadow: 0 10px 40px rgba(0,0,0,0.5);
+        }
+        /* 배경 사진 */
+        .st-header-bg {
+          position: absolute;
+          inset: 0;
+          background-image: url('/idol-logo.png');
+          background-size: cover;
+          background-position: center 25%;
+          background-repeat: no-repeat;
+        }
+        /* 어두운 그라데이션 막 (아래로 갈수록 어둡게 → 글씨 또렷) */
+        .st-header-overlay {
+          position: absolute;
+          inset: 0;
+          background: linear-gradient(
+            180deg,
+            rgba(10,10,10,0.15) 0%,
+            rgba(10,10,10,0.35) 40%,
+            rgba(10,10,10,0.85) 80%,
+            rgba(10,10,10,0.96) 100%
+          );
         }
         .st-header::before {
           content: '';
           position: absolute;
           top: 0; left: 50%;
           transform: translateX(-50%);
-          width: 60%; height: 2px;
+          width: 70%; height: 2px;
           background: linear-gradient(90deg, transparent, #c9a227, transparent);
+          z-index: 3;
         }
-        .st-logo-ring {
-          width: 150px; height: 150px;
-          border-radius: 50%;
-          margin: 0 auto 1.6rem;
-          padding: 4px;
-          background: linear-gradient(135deg, #e8d48f, #c9a227, #8a6d1f, #c9a227);
-          display: flex; align-items: center; justify-content: center;
-          box-shadow:
-            0 0 40px rgba(201,162,39,0.4),
-            0 0 80px rgba(201,162,39,0.15),
-            inset 0 0 20px rgba(0,0,0,0.3);
+        /* 글씨 영역 (아래쪽) */
+        .st-header-content {
           position: relative;
+          z-index: 2;
+          width: 100%;
+          text-align: center;
+          padding: 2rem 1.5rem 1.8rem;
         }
-        .st-logo-inner {
-          width: 100%; height: 100%;
-          border-radius: 50%;
-          background: #161616;
-          display: flex; align-items: center; justify-content: center;
-          font-size: 3rem;
-          overflow: hidden;
-        }
-        .st-logo-inner img { width: 100%; height: 100%; object-fit: cover; border-radius: 50%; }
         .st-brand {
-          font-size: 2rem;
-          font-weight: 500;
+          font-size: 2.2rem;
+          font-weight: 700;
           letter-spacing: -0.5px;
           line-height: 1;
           color: #f5f4ef;
-          margin-top: 0.5rem;
+          text-shadow:
+            -2px -2px 0 #000, 2px -2px 0 #000, -2px 2px 0 #000, 2px 2px 0 #000,
+            -2px 0 0 #000, 2px 0 0 #000, 0 -2px 0 #000, 0 2px 0 #000,
+            0 3px 14px rgba(0,0,0,0.9);
         }
         .st-brand .accent {
           font-family: 'Cormorant Garamond', serif;
-          font-size: 3.8rem;
+          font-size: 4rem;
           font-weight: 700;
           color: #e8d48f;
           letter-spacing: 0.5px;
           margin-right: 0.2em;
           vertical-align: -0.05em;
-          text-shadow: 0 0 20px rgba(201,162,39,0.5), 0 0 40px rgba(201,162,39,0.2);
-        }
-        .st-tagline {
-          margin-top: 0.9rem;
-          font-size: 0.82rem;
-          letter-spacing: 5px;
-          color: #9a8f6a;
-          font-weight: 500;
+          text-shadow:
+            -2px -2px 0 #000, 2px -2px 0 #000, -2px 2px 0 #000, 2px 2px 0 #000,
+            -2px 0 0 #000, 2px 0 0 #000, 0 -2px 0 #000, 0 2px 0 #000,
+            0 0 22px rgba(201,162,39,0.7), 0 3px 14px rgba(0,0,0,0.95);
         }
         .st-divider {
           display: flex; align-items: center; justify-content: center;
-          gap: 0.8rem; margin-top: 1.4rem;
+          gap: 0.8rem; margin-top: 1.3rem;
         }
         .st-divider .line {
-          height: 1px; width: 60px;
-          background: linear-gradient(90deg, transparent, rgba(201,162,39,0.6));
+          height: 1px; width: 55px;
+          background: linear-gradient(90deg, transparent, rgba(201,162,39,0.7));
         }
         .st-divider .line.right {
-          background: linear-gradient(90deg, rgba(201,162,39,0.6), transparent);
+          background: linear-gradient(90deg, rgba(201,162,39,0.7), transparent);
         }
         .st-divider .diamond {
           width: 6px; height: 6px;
@@ -1373,9 +1378,9 @@ export default function SmartTripAnalyzer() {
 
         /* 모바일 */
         @media (max-width: 480px) {
-          .st-brand { font-size: 1.6rem; }
-          .st-brand .accent { font-size: 2.8rem; }
-          .st-logo-ring { width: 120px; height: 120px; }
+          .st-brand { font-size: 1.7rem; }
+          .st-brand .accent { font-size: 3rem; }
+          .st-header { min-height: 280px; }
           .st-rank-name { font-size: 1.3rem; }
           .st-rank-vol { font-size: 1.9rem; }
           .st-stat-num { font-size: 1.7rem; }
@@ -1384,29 +1389,19 @@ export default function SmartTripAnalyzer() {
       `}</style>
 
       <div className="st-wrap">
-        {/* 헤더 */}
+        {/* 헤더 — 포스터 스타일 */}
         <div className="st-header">
-          <div className="st-logo-ring">
-            <div className="st-logo-inner">
-              <img
-                src="/idol-logo.png"
-                alt="Profile"
-                onError={(e) => {
-                  const target = e.target as HTMLImageElement;
-                  const parent = target.parentElement;
-                  if (parent) parent.innerHTML = '<div style="font-size:2rem;">📦</div>';
-                }}
-              />
+          <div className="st-header-bg"></div>
+          <div className="st-header-overlay"></div>
+          <div className="st-header-content">
+            <div className="st-brand">
+              <span className="accent">B&amp;M</span> 물량분석
             </div>
-          </div>
-          <div className="st-brand">
-            <span className="accent">B&amp;M</span> 물량분석
-          </div>
-          <div className="st-tagline">캠도 물량 자동 분석</div>
-          <div className="st-divider">
-            <span className="line"></span>
-            <span className="diamond"></span>
-            <span className="line right"></span>
+            <div className="st-divider">
+              <span className="line"></span>
+              <span className="diamond"></span>
+              <span className="line right"></span>
+            </div>
           </div>
         </div>
 
