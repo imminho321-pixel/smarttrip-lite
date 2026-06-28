@@ -917,29 +917,6 @@ export default function SmartTripAnalyzer() {
   const copyToClipboard = async () => {
     if (!result || !targetDate) return;
 
-    // 복사 시점에 최신 월 누적 데이터 조회 (사람별 26~25일 합)
-    let monthlyMap: Record<string, number> = {};
-    let monthlyOk = false;
-    try {
-      const period = getBillingPeriod(targetDate);
-      const res = await fetch(
-        `${SUPABASE_URL}/rest/v1/daily_volume?work_date=gte.${period.start}&work_date=lte.${period.end}&select=worker_name,volume`,
-        {
-          headers: {
-            apikey: SUPABASE_KEY,
-            Authorization: `Bearer ${SUPABASE_KEY}`,
-          },
-        }
-      );
-      if (res.ok) {
-        const rows: { worker_name: string; volume: number }[] = await res.json();
-        rows.forEach((r) => {
-          monthlyMap[r.worker_name] = (monthlyMap[r.worker_name] || 0) + (r.volume || 0);
-        });
-        monthlyOk = true;
-      }
-    } catch {}
-
     const dateObj = new Date(targetDate);
     const year = dateObj.getFullYear();
     const month = dateObj.getMonth() + 1;
@@ -983,11 +960,6 @@ export default function SmartTripAnalyzer() {
 
       if (hasTrip2) {
         text += '[금일 총합계: ' + data.total + ']\n';
-      }
-      // 월 누적 (26~25일, 1차+2차 합산 기준)
-      if (monthlyOk) {
-        const monthVol = monthlyMap[worker] || 0;
-        text += '[월 누적: ' + monthVol.toLocaleString() + ']\n';
       }
       text += '\n';
     });
