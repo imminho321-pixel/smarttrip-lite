@@ -99,7 +99,7 @@ export default function SmartTripAnalyzer() {
       }
     } catch {}
 
-    // 2) 클라우드에서 가장 최근 공유 내용 자동 불러오기 (있으면 덮어씀)
+    // 2) 클라우드에서 가장 최근 공유 내용 자동 불러오기 (통째로 덮어씀)
     (async () => {
       try {
         const res = await fetch(
@@ -115,10 +115,10 @@ export default function SmartTripAnalyzer() {
           const rows = await res.json();
           if (rows && rows.length > 0) {
             const d = rows[0];
-            // 공유 내용 중 비어있지 않은 칸만 덮어씀
-            if (d.schedule_data) setScheduleData(d.schedule_data);
-            if (d.trip1_data) setTrip1Data(d.trip1_data);
-            if (d.trip2_data) setTrip2Data(d.trip2_data);
+            // 공유 내용으로 통째로 덮어씀 (빈 칸이면 빈 채로 → 다른 기기에서 비운 게 반영됨)
+            setScheduleData(d.schedule_data || '');
+            setTrip1Data(d.trip1_data || '');
+            setTrip2Data(d.trip2_data || '');
           }
         }
       } catch {}
@@ -902,6 +902,7 @@ export default function SmartTripAnalyzer() {
             schedule_data: scheduleData,
             trip1_data: trip1Data,
             trip2_data: trip2Data,
+            updated_at: new Date().toISOString(), // 저장 시각 기록 (가장 최근 판별용)
           },
         ]),
       });
