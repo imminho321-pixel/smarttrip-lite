@@ -68,17 +68,29 @@ function getBillingPeriod(dateStr: string) {
 function BillingCalendar({
   dates,
   showSummary = true,
+  detailLabel,
 }: {
-  dates: { date: string; vol: number }[];
+  dates: { date: string; vol: number; routes?: { route: string; vol: number }[]; workers?: { name: string; vol: number }[] }[];
   showSummary?: boolean;
+  detailLabel?: 'route' | 'worker'; // 날짜 클릭 시 상세 종류 (route=노선별, worker=담당자별)
 }) {
   // 로컬 날짜를 YYYY-MM-DD로 (toISOString은 UTC 변환으로 날짜가 밀릴 수 있어 사용 안 함)
   const fmtLocal = (d: Date) =>
     `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 
-  // 날짜별 물량을 map으로
+  const displayNm = (n: string) => (n === '김대원' ? '대원♡빛나' : n);
+
+  // 날짜별 물량 + 상세를 map으로
   const volMap: Record<string, number> = {};
-  dates.forEach((d) => { volMap[d.date] = d.vol; });
+  const detailMap: Record<string, { route: string; vol: number }[] | { name: string; vol: number }[]> = {};
+  dates.forEach((d) => {
+    volMap[d.date] = d.vol;
+    if (d.routes) detailMap[d.date] = d.routes;
+    else if (d.workers) detailMap[d.date] = d.workers;
+  });
+
+  // 클릭해서 상세 펼친 날짜
+  const [openDate, setOpenDate] = useState<string | null>(null);
 
   // 데이터가 있는 정산월들 목록 만들기 (중복 제거, 정렬)
   const periodsSet = new Set<string>();
@@ -126,9 +138,13 @@ function BillingCalendar({
     const isBlue = dow === 6 && !holiday;
     const dateColor = isRed ? '#e0574f' : isBlue ? '#5a8ad9' : vol ? '#e8d48f' : '#7a7a72';
 
+    const hasDetail = !!vol && !!detailLabel && !!detailMap[key];
+    const isOpen = openDate === key;
+
     cells.push(
       <div
         key={key}
+        onClick={() => { if (hasDetail) setOpenDate(isOpen ? null : key); }}
         style={{
           aspectRatio: '0.8 / 1',
           borderRadius: '10px',
@@ -136,10 +152,15 @@ function BillingCalendar({
           display: 'flex', flexDirection: 'column',
           alignItems: 'center', justifyContent: 'space-between',
           position: 'relative',
-          background: vol
+          cursor: hasDetail ? 'pointer' : 'default',
+          background: isOpen
+            ? 'linear-gradient(160deg, rgba(201,162,39,0.35), rgba(201,162,39,0.12))'
+            : vol
             ? 'linear-gradient(160deg, rgba(201,162,39,0.16), rgba(201,162,39,0.05))'
             : 'rgba(255,255,255,0.02)',
-          border: vol ? '1px solid rgba(201,162,39,0.35)' : '1px solid rgba(255,255,255,0.04)',
+          border: isOpen
+            ? '1.5px solid rgba(201,162,39,0.7)'
+            : vol ? '1px solid rgba(201,162,39,0.35)' : '1px solid rgba(255,255,255,0.04)',
         }}
       >
         {holiday && (
@@ -237,6 +258,46 @@ function BillingCalendar({
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: '5px' }}>
         {cells}
       </div>
+
+      {/* 선택한 날 상세 (노선별 또는 담당자별) */}
+      {openDate && detailMap[openDate] && (
+        <div
+          style={{
+            marginTop: '0.9rem',
+            padding: '0.9rem',
+            borderRadius: '12px',
+            background: 'rgba(201,162,39,0.08)',
+            border: '1px solid rgba(201,162,39,0.3)',
+          }}
+        >
+          <div style={{ fontSize: '0.8rem', color: '#e8d48f', fontWeight: 700, marginBottom: '0.6rem' }}>
+            {(() => {
+              const dt = new Date(openDate + 'T00:00:00');
+              const wd = ['일', '월', '화', '수', '목', '금', '토'][dt.getDay()];
+              const hol = HOLIDAYS[openDate];
+              return `${dt.getMonth() + 1}/${dt.getDate()}(${wd})${hol ? ' · ' + hol : ''} — ${detailLabel === 'route' ? '노선별' : '담당자별'}`;
+            })()}
+          </div>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.4rem' }}>
+            {(detailMap[openDate] as any[]).map((item, i) => (
+              <span
+                key={i}
+                style={{
+                  fontSize: '0.85rem',
+                  background: 'rgba(0,0,0,0.3)',
+                  border: '1px solid rgba(201,162,39,0.25)',
+                  borderRadius: '8px',
+                  padding: '0.35rem 0.7rem',
+                  color: '#d8d4c8',
+                }}
+              >
+                {detailLabel === 'route' ? item.route : displayNm(item.name)}{' '}
+                <b style={{ color: '#e8d48f' }}>{item.vol.toLocaleString()}</b>
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* 이 달 요약 */}
       {showSummary ? (
@@ -744,7 +805,7 @@ export default function SmartTripAnalyzer() {
           total: number;
           routes: Record<string, number>;
           days: Set<string>;
-          byDate: Record<string, number>;
+          byDate: Record<string, { vol: number; routes: Record<string, number> }>;
           completeTotal: number; // 완전한 날만의 합 (평균용)
           completeDays: Set<string>;
         }
@@ -764,8 +825,13 @@ export default function SmartTripAnalyzer() {
         byWorker[r.worker_name].routes[r.route] =
           (byWorker[r.worker_name].routes[r.route] || 0) + (r.volume || 0);
         byWorker[r.worker_name].days.add(r.work_date);
-        byWorker[r.worker_name].byDate[r.work_date] =
-          (byWorker[r.worker_name].byDate[r.work_date] || 0) + (r.volume || 0);
+        // 날짜별: 총합 + 노선별
+        if (!byWorker[r.worker_name].byDate[r.work_date]) {
+          byWorker[r.worker_name].byDate[r.work_date] = { vol: 0, routes: {} };
+        }
+        byWorker[r.worker_name].byDate[r.work_date].vol += r.volume || 0;
+        byWorker[r.worker_name].byDate[r.work_date].routes[r.route] =
+          (byWorker[r.worker_name].byDate[r.work_date].routes[r.route] || 0) + (r.volume || 0);
         // 완전한 날이면 평균용 합계에도 추가
         if (completeDates.has(r.work_date)) {
           byWorker[r.worker_name].completeTotal += r.volume || 0;
@@ -787,7 +853,13 @@ export default function SmartTripAnalyzer() {
               .map(([route, vol]) => ({ route, vol }))
               .sort((a, b) => b.vol - a.vol),
             dates: Object.entries(d.byDate)
-              .map(([date, vol]) => ({ date, vol }))
+              .map(([date, info]) => ({
+                date,
+                vol: info.vol,
+                routes: Object.entries(info.routes)
+                  .map(([route, vol]) => ({ route, vol }))
+                  .sort((a, b) => b.vol - a.vol),
+              }))
               .sort((a, b) => b.date.localeCompare(a.date)),
           };
         })
@@ -836,7 +908,7 @@ export default function SmartTripAnalyzer() {
           total: number;
           workers: Record<string, number>;
           days: Set<string>;
-          byDate: Record<string, number>;
+          byDate: Record<string, { vol: number; workers: Record<string, number> }>;
         }
       > = {};
       rows.forEach((r) => {
@@ -847,8 +919,13 @@ export default function SmartTripAnalyzer() {
         byRoute[r.route].workers[r.worker_name] =
           (byRoute[r.route].workers[r.worker_name] || 0) + (r.volume || 0);
         byRoute[r.route].days.add(r.work_date);
-        byRoute[r.route].byDate[r.work_date] =
-          (byRoute[r.route].byDate[r.work_date] || 0) + (r.volume || 0);
+        // 날짜별: 총합 + 담당자별
+        if (!byRoute[r.route].byDate[r.work_date]) {
+          byRoute[r.route].byDate[r.work_date] = { vol: 0, workers: {} };
+        }
+        byRoute[r.route].byDate[r.work_date].vol += r.volume || 0;
+        byRoute[r.route].byDate[r.work_date].workers[r.worker_name] =
+          (byRoute[r.route].byDate[r.work_date].workers[r.worker_name] || 0) + (r.volume || 0);
       });
 
       const routes = Object.entries(byRoute)
@@ -863,7 +940,7 @@ export default function SmartTripAnalyzer() {
           }
           let completeTotal = 0;
           completeDates.forEach((dt) => {
-            completeTotal += d.byDate[dt] || 0;
+            completeTotal += d.byDate[dt] ? d.byDate[dt].vol : 0;
           });
           const avg = completeDates.length > 0 ? Math.round(completeTotal / completeDates.length) : null;
 
@@ -877,7 +954,13 @@ export default function SmartTripAnalyzer() {
               .map(([name, vol]) => ({ name, vol }))
               .sort((a, b) => b.vol - a.vol),
             dates: Object.entries(d.byDate)
-              .map(([date, vol]) => ({ date, vol }))
+              .map(([date, info]) => ({
+                date,
+                vol: info.vol,
+                workers: Object.entries(info.workers)
+                  .map(([name, vol]) => ({ name, vol }))
+                  .sort((a, b) => b.vol - a.vol),
+              }))
               .sort((a, b) => b.date.localeCompare(a.date)),
           };
         })
@@ -2247,7 +2330,7 @@ export default function SmartTripAnalyzer() {
                                   <div style={{ fontSize: '0.75rem', color: '#c9a227', letterSpacing: '1px', marginBottom: '0.6rem' }}>
                                     날짜별 물량
                                   </div>
-                                  <BillingCalendar dates={w.dates} />
+                                  <BillingCalendar dates={w.dates} detailLabel="route" />
                                 </div>
                               )}
 
@@ -2425,38 +2508,14 @@ export default function SmartTripAnalyzer() {
                                 borderTop: '1px solid rgba(201,162,39,0.2)',
                               }}
                             >
-                              {/* 날짜별 물량 */}
-                              {r.dates && (
-                                <>
+                              {/* 날짜별 물량 (정산월 달력) */}
+                              {r.dates && r.dates.length > 0 && (
+                                <div onClick={(e) => e.stopPropagation()}>
                                   <div style={{ fontSize: '0.75rem', color: '#c9a227', letterSpacing: '1px', marginBottom: '0.6rem' }}>
                                     날짜별 물량
                                   </div>
-                                  <div style={{ display: 'grid', gap: '0.4rem' }}>
-                                    {r.dates.map((d: any) => {
-                                      const dt = new Date(d.date + 'T00:00:00');
-                                      const wd = ['일', '월', '화', '수', '목', '금', '토'][dt.getDay()];
-                                      const label = `${dt.getMonth() + 1}/${dt.getDate()}(${wd})`;
-                                      return (
-                                        <div
-                                          key={d.date}
-                                          style={{
-                                            display: 'flex',
-                                            justifyContent: 'space-between',
-                                            padding: '0.55rem 0.85rem',
-                                            borderRadius: '10px',
-                                            background: 'rgba(201,162,39,0.06)',
-                                            border: '1px solid rgba(201,162,39,0.12)',
-                                          }}
-                                        >
-                                          <span style={{ color: '#d8d4c8', fontWeight: 600 }}>{label}</span>
-                                          <span style={{ color: '#e8d48f', fontWeight: 800, fontVariantNumeric: 'tabular-nums' }}>
-                                            {d.vol.toLocaleString()}
-                                          </span>
-                                        </div>
-                                      );
-                                    })}
-                                  </div>
-                                </>
+                                  <BillingCalendar dates={r.dates} detailLabel="worker" />
+                                </div>
                               )}
 
                               {/* 담당자별 물량 */}
