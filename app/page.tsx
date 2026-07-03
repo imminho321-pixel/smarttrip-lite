@@ -238,6 +238,35 @@ export default function SmartTripAnalyzer() {
     return subRoutes.size > 0 ? Array.from(subRoutes).sort() : [route];
   };
 
+  // ===== Supabase에서 조건에 맞는 모든 행 가져오기 (1000줄 한계 극복) =====
+  // Supabase는 한 번에 최대 1000줄만 반환하므로, Range 헤더로 나눠서 끝까지 가져옴
+  const fetchAllRows = async (url: string): Promise<any[]> => {
+    const pageSize = 1000;
+    let from = 0;
+    let all: any[] = [];
+    while (true) {
+      const res = await fetch(url, {
+        headers: {
+          apikey: SUPABASE_KEY,
+          Authorization: `Bearer ${SUPABASE_KEY}`,
+          Range: `${from}-${from + pageSize - 1}`,
+          'Range-Unit': 'items',
+        },
+      });
+      if (!res.ok) {
+        // 실패 시 지금까지 모은 것 반환 (첫 페이지도 실패면 예외)
+        if (from === 0) throw new Error('fetch failed');
+        break;
+      }
+      const rows = await res.json();
+      all = all.concat(rows);
+      if (!rows || rows.length < pageSize) break; // 마지막 페이지
+      from += pageSize;
+      if (from > 100000) break; // 안전장치 (10만 줄 이상이면 중단)
+    }
+    return all;
+  };
+
   // ===== Supabase: 그날 사람별 물량 + 노선별 상세 저장 (날짜 기준 덮어쓰기) =====
   const saveToCloud = async (
     workDate: string,
@@ -351,22 +380,16 @@ export default function SmartTripAnalyzer() {
     setMonthlyLoading(true);
     try {
       const period = getBillingPeriod(workDate);
-      const res = await fetch(
-        `${SUPABASE_URL}/rest/v1/daily_volume?work_date=gte.${period.start}&work_date=lte.${period.end}&select=worker_name,volume,work_date`,
-        {
-          headers: {
-            apikey: SUPABASE_KEY,
-            Authorization: `Bearer ${SUPABASE_KEY}`,
-          },
-        }
-      );
-      if (!res.ok) {
+      let rows: { worker_name: string; volume: number; work_date: string }[];
+      try {
+        rows = await fetchAllRows(
+          `${SUPABASE_URL}/rest/v1/daily_volume?work_date=gte.${period.start}&work_date=lte.${period.end}&select=worker_name,volume,work_date`
+        );
+      } catch {
         setMonthlyData({ error: true, period });
         setMonthlyLoading(false);
         return;
       }
-      const rows: { worker_name: string; volume: number; work_date: string }[] =
-        await res.json();
 
       // 사람별 합산
       const totals: Record<string, number> = {};
@@ -421,22 +444,16 @@ export default function SmartTripAnalyzer() {
     setSearchLoading(true);
     setWorkerSearchResult(null);
     try {
-      const res = await fetch(
-        `${SUPABASE_URL}/rest/v1/route_detail?work_date=gte.${searchStart}&work_date=lte.${searchEnd}&select=worker_name,route,volume,work_date,trip`,
-        {
-          headers: {
-            apikey: SUPABASE_KEY,
-            Authorization: `Bearer ${SUPABASE_KEY}`,
-          },
-        }
-      );
-      if (!res.ok) {
+      let rows: { worker_name: string; route: string; volume: number; work_date: string; trip: number }[];
+      try {
+        rows = await fetchAllRows(
+          `${SUPABASE_URL}/rest/v1/route_detail?work_date=gte.${searchStart}&work_date=lte.${searchEnd}&select=worker_name,route,volume,work_date,trip`
+        );
+      } catch {
         setWorkerSearchResult({ error: true });
         setSearchLoading(false);
         return;
       }
-      const rows: { worker_name: string; route: string; volume: number; work_date: string; trip: number }[] =
-        await res.json();
 
       // 날짜별로 1차/2차 존재 여부 파악 (전체 기준: 그날 2차가 하나라도 있으면 2차 운영일)
       const dateHasTrip1: Record<string, boolean> = {};
@@ -524,22 +541,16 @@ export default function SmartTripAnalyzer() {
     setSearchLoading(true);
     setRouteSearchResult(null);
     try {
-      const res = await fetch(
-        `${SUPABASE_URL}/rest/v1/route_detail?work_date=gte.${searchStart}&work_date=lte.${searchEnd}&select=worker_name,route,volume,work_date,trip`,
-        {
-          headers: {
-            apikey: SUPABASE_KEY,
-            Authorization: `Bearer ${SUPABASE_KEY}`,
-          },
-        }
-      );
-      if (!res.ok) {
+      let rows: { worker_name: string; route: string; volume: number; work_date: string; trip: number }[];
+      try {
+        rows = await fetchAllRows(
+          `${SUPABASE_URL}/rest/v1/route_detail?work_date=gte.${searchStart}&work_date=lte.${searchEnd}&select=worker_name,route,volume,work_date,trip`
+        );
+      } catch {
         setRouteSearchResult({ error: true });
         setSearchLoading(false);
         return;
       }
-      const rows: { worker_name: string; route: string; volume: number; work_date: string; trip: number }[] =
-        await res.json();
 
       // 노선별로 1차/2차 존재 여부 파악 (노선 기준: 그 노선이 그날 1차도 2차도 있으면 완전한 날)
       const routeDateTrip: Record<string, { t1: Set<string>; t2: Set<string> }> = {};
