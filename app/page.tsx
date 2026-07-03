@@ -1926,8 +1926,8 @@ export default function SmartTripAnalyzer() {
                             </div>
                           )}
 
-                          {/* 날짜별 상세 (클릭 시 펼쳐짐) */}
-                          {isExpanded && w.dates && (
+                          {/* 클릭 시 펼쳐짐: 날짜별 + 노선별 */}
+                          {isExpanded && (
                             <div
                               style={{
                                 marginTop: '0.9rem',
@@ -1935,45 +1935,54 @@ export default function SmartTripAnalyzer() {
                                 borderTop: '1px solid rgba(201,162,39,0.2)',
                               }}
                             >
-                              <div style={{ fontSize: '0.75rem', color: '#c9a227', letterSpacing: '1px', marginBottom: '0.6rem' }}>
-                                날짜별 물량
+                              {/* 날짜별 물량 */}
+                              {w.dates && (
+                                <>
+                                  <div style={{ fontSize: '0.75rem', color: '#c9a227', letterSpacing: '1px', marginBottom: '0.6rem' }}>
+                                    날짜별 물량
+                                  </div>
+                                  <div style={{ display: 'grid', gap: '0.4rem' }}>
+                                    {w.dates.map((d: any) => {
+                                      const dt = new Date(d.date + 'T00:00:00');
+                                      const wd = ['일', '월', '화', '수', '목', '금', '토'][dt.getDay()];
+                                      const label = `${dt.getMonth() + 1}/${dt.getDate()}(${wd})`;
+                                      return (
+                                        <div
+                                          key={d.date}
+                                          style={{
+                                            display: 'flex',
+                                            justifyContent: 'space-between',
+                                            padding: '0.55rem 0.85rem',
+                                            borderRadius: '10px',
+                                            background: 'rgba(201,162,39,0.06)',
+                                            border: '1px solid rgba(201,162,39,0.12)',
+                                          }}
+                                        >
+                                          <span style={{ color: '#d8d4c8', fontWeight: 600 }}>{label}</span>
+                                          <span style={{ color: '#e8d48f', fontWeight: 800, fontVariantNumeric: 'tabular-nums' }}>
+                                            {d.vol.toLocaleString()}
+                                          </span>
+                                        </div>
+                                      );
+                                    })}
+                                  </div>
+                                </>
+                              )}
+
+                              {/* 노선별 물량 */}
+                              <div style={{ fontSize: '0.75rem', color: '#c9a227', letterSpacing: '1px', margin: '1rem 0 0.6rem' }}>
+                                노선별 물량 ({w.routes.length}개)
                               </div>
-                              <div style={{ display: 'grid', gap: '0.4rem' }}>
-                                {w.dates.map((d: any) => {
-                                  const dt = new Date(d.date + 'T00:00:00');
-                                  const wd = ['일', '월', '화', '수', '목', '금', '토'][dt.getDay()];
-                                  const label = `${dt.getMonth() + 1}/${dt.getDate()}(${wd})`;
-                                  return (
-                                    <div
-                                      key={d.date}
-                                      style={{
-                                        display: 'flex',
-                                        justifyContent: 'space-between',
-                                        padding: '0.55rem 0.85rem',
-                                        borderRadius: '10px',
-                                        background: 'rgba(201,162,39,0.06)',
-                                        border: '1px solid rgba(201,162,39,0.12)',
-                                      }}
-                                    >
-                                      <span style={{ color: '#d8d4c8', fontWeight: 600 }}>{label}</span>
-                                      <span style={{ color: '#e8d48f', fontWeight: 800, fontVariantNumeric: 'tabular-nums' }}>
-                                        {d.vol.toLocaleString()}
-                                      </span>
-                                    </div>
-                                  );
-                                })}
+                              <div className="st-detail-routes" style={{ marginTop: 0 }}>
+                                {w.routes.map((r: any) => (
+                                  <span key={r.route} className="st-chip">
+                                    {r.route}
+                                    <b>{r.vol.toLocaleString()}</b>
+                                  </span>
+                                ))}
                               </div>
                             </div>
                           )}
-
-                          <div className="st-detail-routes">
-                            {w.routes.map((r: any) => (
-                              <span key={r.route} className="st-chip">
-                                {r.route}
-                                <b>{r.vol.toLocaleString()}</b>
-                              </span>
-                            ))}
-                          </div>
                         </div>
                       );
                     })}
@@ -2125,8 +2134,8 @@ export default function SmartTripAnalyzer() {
                             </div>
                           )}
 
-                          {/* 날짜별 상세 (클릭 시 펼쳐짐) */}
-                          {isExpanded && r.dates && (
+                          {/* 클릭 시 펼쳐짐: 날짜별 + 담당자별 */}
+                          {isExpanded && (
                             <div
                               style={{
                                 marginTop: '0.9rem',
@@ -2134,45 +2143,54 @@ export default function SmartTripAnalyzer() {
                                 borderTop: '1px solid rgba(201,162,39,0.2)',
                               }}
                             >
-                              <div style={{ fontSize: '0.75rem', color: '#c9a227', letterSpacing: '1px', marginBottom: '0.6rem' }}>
-                                날짜별 물량
+                              {/* 날짜별 물량 */}
+                              {r.dates && (
+                                <>
+                                  <div style={{ fontSize: '0.75rem', color: '#c9a227', letterSpacing: '1px', marginBottom: '0.6rem' }}>
+                                    날짜별 물량
+                                  </div>
+                                  <div style={{ display: 'grid', gap: '0.4rem' }}>
+                                    {r.dates.map((d: any) => {
+                                      const dt = new Date(d.date + 'T00:00:00');
+                                      const wd = ['일', '월', '화', '수', '목', '금', '토'][dt.getDay()];
+                                      const label = `${dt.getMonth() + 1}/${dt.getDate()}(${wd})`;
+                                      return (
+                                        <div
+                                          key={d.date}
+                                          style={{
+                                            display: 'flex',
+                                            justifyContent: 'space-between',
+                                            padding: '0.55rem 0.85rem',
+                                            borderRadius: '10px',
+                                            background: 'rgba(201,162,39,0.06)',
+                                            border: '1px solid rgba(201,162,39,0.12)',
+                                          }}
+                                        >
+                                          <span style={{ color: '#d8d4c8', fontWeight: 600 }}>{label}</span>
+                                          <span style={{ color: '#e8d48f', fontWeight: 800, fontVariantNumeric: 'tabular-nums' }}>
+                                            {d.vol.toLocaleString()}
+                                          </span>
+                                        </div>
+                                      );
+                                    })}
+                                  </div>
+                                </>
+                              )}
+
+                              {/* 담당자별 물량 */}
+                              <div style={{ fontSize: '0.75rem', color: '#c9a227', letterSpacing: '1px', margin: '1rem 0 0.6rem' }}>
+                                담당자별 물량 ({r.workers.length}명)
                               </div>
-                              <div style={{ display: 'grid', gap: '0.4rem' }}>
-                                {r.dates.map((d: any) => {
-                                  const dt = new Date(d.date + 'T00:00:00');
-                                  const wd = ['일', '월', '화', '수', '목', '금', '토'][dt.getDay()];
-                                  const label = `${dt.getMonth() + 1}/${dt.getDate()}(${wd})`;
-                                  return (
-                                    <div
-                                      key={d.date}
-                                      style={{
-                                        display: 'flex',
-                                        justifyContent: 'space-between',
-                                        padding: '0.55rem 0.85rem',
-                                        borderRadius: '10px',
-                                        background: 'rgba(201,162,39,0.06)',
-                                        border: '1px solid rgba(201,162,39,0.12)',
-                                      }}
-                                    >
-                                      <span style={{ color: '#d8d4c8', fontWeight: 600 }}>{label}</span>
-                                      <span style={{ color: '#e8d48f', fontWeight: 800, fontVariantNumeric: 'tabular-nums' }}>
-                                        {d.vol.toLocaleString()}
-                                      </span>
-                                    </div>
-                                  );
-                                })}
+                              <div className="st-detail-routes" style={{ marginTop: 0 }}>
+                                {r.workers.map((w: any) => (
+                                  <span key={w.name} className="st-chip">
+                                    {w.name === '김대원' ? '대원♡빛나' : w.name}
+                                    <b>{w.vol.toLocaleString()}</b>
+                                  </span>
+                                ))}
                               </div>
                             </div>
                           )}
-
-                          <div className="st-detail-routes">
-                            {r.workers.map((w: any) => (
-                              <span key={w.name} className="st-chip">
-                                {w.name === '김대원' ? '대원♡빛나' : w.name}
-                                <b>{w.vol.toLocaleString()}</b>
-                              </span>
-                            ))}
-                          </div>
                         </div>
                       );
                     })}
