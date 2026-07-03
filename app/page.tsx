@@ -1227,10 +1227,16 @@ export default function SmartTripAnalyzer() {
       const trip2Ratio =
         hasTrip2 && data.total > 0 ? ((data.trip2 / data.total) * 100).toFixed(2) : '0.00';
       const displayVolume = hasTrip2 ? data.trip2 : data.trip1;
-      const ratioText = hasTrip2 ? ' (비율: ' + trip2Ratio + '%)' : '';
       const nameForCopy = displayName(worker);
+      // 대원빛나(김대원)는 이름 뒤에 수박 이모지도 추가
+      const nameWithSuffix = worker === '김대원' ? nameForCopy + ' 🍉' : nameForCopy;
 
-      text += emoji + ' ' + nameForCopy + ' (합계: ' + displayVolume + ')' + ratioText + '\n';
+      // 이름 + 합계 (한 줄)
+      text += emoji + ' ' + nameWithSuffix + ' (합계: ' + displayVolume + ')\n';
+      // 비율은 다음 줄로 (핸드폰에서 줄바꿈 깨짐 방지)
+      if (hasTrip2) {
+        text += '   └ 비율 ' + trip2Ratio + '%\n';
+      }
 
       data.routes.forEach(({ route, trip1, trip2 }: any) => {
         const routeVolume = hasTrip2 ? trip2 : trip1;
