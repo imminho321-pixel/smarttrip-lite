@@ -6,6 +6,35 @@ import { useState, useEffect } from 'react';
 const SUPABASE_URL = 'https://wavnjbrxlfbzoyfnvitn.supabase.co';
 const SUPABASE_KEY = 'sb_publishable_DssDmObagqPE8p6XLNaxcw_ufdr_ZeG';
 
+// 대한민국 공휴일 + 대체공휴일 (2026~2030)
+const HOLIDAYS: Record<string, string> = {
+  '2026-01-01': '신정', '2026-02-16': '설날', '2026-02-17': '설날', '2026-02-18': '설날',
+  '2026-03-01': '삼일절', '2026-03-02': '삼일절 대체', '2026-05-05': '어린이날',
+  '2026-05-24': '부처님오신날', '2026-05-25': '부처님오신날 대체', '2026-06-06': '현충일',
+  '2026-08-15': '광복절', '2026-09-24': '추석', '2026-09-25': '추석', '2026-09-26': '추석',
+  '2026-10-03': '개천절', '2026-10-09': '한글날', '2026-12-25': '크리스마스',
+  '2027-01-01': '신정', '2027-02-06': '설날', '2027-02-07': '설날', '2027-02-08': '설날',
+  '2027-02-09': '설날 대체', '2027-03-01': '삼일절', '2027-05-05': '어린이날',
+  '2027-05-13': '부처님오신날', '2027-06-06': '현충일', '2027-08-15': '광복절',
+  '2027-08-16': '광복절 대체', '2027-09-14': '추석', '2027-09-15': '추석', '2027-09-16': '추석',
+  '2027-10-03': '개천절', '2027-10-04': '개천절 대체', '2027-10-09': '한글날',
+  '2027-12-25': '크리스마스', '2027-12-27': '크리스마스 대체',
+  '2028-01-01': '신정', '2028-01-26': '설날', '2028-01-27': '설날', '2028-01-28': '설날',
+  '2028-03-01': '삼일절', '2028-05-02': '부처님오신날', '2028-05-05': '어린이날',
+  '2028-06-06': '현충일', '2028-08-15': '광복절', '2028-10-02': '추석', '2028-10-03': '추석',
+  '2028-10-04': '추석', '2028-10-09': '한글날', '2028-12-25': '크리스마스',
+  '2029-01-01': '신정', '2029-02-12': '설날', '2029-02-13': '설날', '2029-02-14': '설날',
+  '2029-03-01': '삼일절', '2029-05-05': '어린이날', '2029-05-07': '어린이날 대체',
+  '2029-05-20': '부처님오신날', '2029-05-21': '부처님오신날 대체', '2029-06-06': '현충일',
+  '2029-08-15': '광복절', '2029-09-21': '추석', '2029-09-22': '추석', '2029-09-23': '추석',
+  '2029-09-24': '추석 대체', '2029-10-03': '개천절', '2029-10-09': '한글날', '2029-12-25': '크리스마스',
+  '2030-01-01': '신정', '2030-02-02': '설날', '2030-02-03': '설날', '2030-02-04': '설날',
+  '2030-02-05': '설날 대체', '2030-03-01': '삼일절', '2030-05-05': '어린이날',
+  '2030-05-06': '어린이날 대체', '2030-05-09': '부처님오신날', '2030-06-06': '현충일',
+  '2030-08-15': '광복절', '2030-09-11': '추석', '2030-09-12': '추석', '2030-09-13': '추석',
+  '2030-10-03': '개천절', '2030-10-09': '한글날', '2030-12-25': '크리스마스',
+};
+
 // 정산 기간 계산: 어떤 날짜가 속한 26일~다음달25일 기간 반환
 function getBillingPeriod(dateStr: string) {
   const d = new Date(dateStr + 'T00:00:00');
@@ -35,6 +64,203 @@ function getBillingPeriod(dateStr: string) {
   };
 }
 
+// 정산월 달력 컴포넌트 (26일 시작, 화살표로 월 넘김)
+function BillingCalendar({ dates }: { dates: { date: string; vol: number }[] }) {
+  // 로컬 날짜를 YYYY-MM-DD로 (toISOString은 UTC 변환으로 날짜가 밀릴 수 있어 사용 안 함)
+  const fmtLocal = (d: Date) =>
+    `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+
+  // 날짜별 물량을 map으로
+  const volMap: Record<string, number> = {};
+  dates.forEach((d) => { volMap[d.date] = d.vol; });
+
+  // 데이터가 있는 정산월들 목록 만들기 (중복 제거, 정렬)
+  const periodsSet = new Set<string>();
+  dates.forEach((d) => {
+    const p = getBillingPeriod(d.date);
+    periodsSet.add(p.start); // 정산월 시작일로 식별
+  });
+  const periodStarts = Array.from(periodsSet).sort();
+
+  // 현재 보고 있는 정산월 인덱스 (기본: 가장 최근 = 마지막)
+  const [idx, setIdx] = useState(periodStarts.length - 1);
+
+  if (periodStarts.length === 0) return null;
+
+  const curStart = periodStarts[Math.min(idx, periodStarts.length - 1)];
+  const period = getBillingPeriod(curStart);
+  const startDate = new Date(period.start + 'T00:00:00');
+  const endDate = new Date(period.end + 'T00:00:00');
+
+  // 이 정산월의 합계/근무일
+  let monthTotal = 0;
+  let monthDays = 0;
+  const cur0 = new Date(startDate);
+  while (cur0 <= endDate) {
+    const key = fmtLocal(cur0);
+    if (volMap[key]) { monthTotal += volMap[key]; monthDays++; }
+    cur0.setDate(cur0.getDate() + 1);
+  }
+
+  // 달력 셀 구성
+  const dowNames = ['일', '월', '화', '수', '목', '금', '토'];
+  const cells: any[] = [];
+  // 시작 요일만큼 빈칸
+  const startDow = startDate.getDay();
+  for (let i = 0; i < startDow; i++) {
+    cells.push(<div key={'e' + i} />);
+  }
+  const cur = new Date(startDate);
+  while (cur <= endDate) {
+    const key = fmtLocal(cur);
+    const dow = cur.getDay();
+    const vol = volMap[key];
+    const holiday = HOLIDAYS[key];
+    const isRed = dow === 0 || !!holiday;
+    const isBlue = dow === 6 && !holiday;
+    const dateColor = isRed ? '#e0574f' : isBlue ? '#5a8ad9' : vol ? '#e8d48f' : '#7a7a72';
+
+    cells.push(
+      <div
+        key={key}
+        style={{
+          aspectRatio: '0.8 / 1',
+          borderRadius: '10px',
+          padding: '0.35rem 0.1rem 0.3rem',
+          display: 'flex', flexDirection: 'column',
+          alignItems: 'center', justifyContent: 'space-between',
+          position: 'relative',
+          background: vol
+            ? 'linear-gradient(160deg, rgba(201,162,39,0.16), rgba(201,162,39,0.05))'
+            : 'rgba(255,255,255,0.02)',
+          border: vol ? '1px solid rgba(201,162,39,0.35)' : '1px solid rgba(255,255,255,0.04)',
+        }}
+      >
+        {holiday && (
+          <div
+            style={{
+              position: 'absolute', top: '4px', right: '5px',
+              width: '5px', height: '5px', borderRadius: '50%', background: '#e0574f',
+            }}
+            title={holiday}
+          />
+        )}
+        <div style={{ fontSize: '1.35rem', fontWeight: 800, color: dateColor, lineHeight: 1 }}>
+          {cur.getDate()}
+        </div>
+        {vol ? (
+          <div
+            style={{
+              fontSize: '0.82rem', fontWeight: 800, color: '#1a1407',
+              background: 'linear-gradient(135deg, #e8d48f, #c9a227)',
+              borderRadius: '6px', padding: '2px 3px', minWidth: '85%',
+              textAlign: 'center', fontVariantNumeric: 'tabular-nums', lineHeight: 1.2,
+            }}
+          >
+            {vol.toLocaleString()}
+          </div>
+        ) : (
+          <div style={{ height: '20px' }} />
+        )}
+      </div>
+    );
+    cur.setDate(cur.getDate() + 1);
+  }
+
+  const canPrev = idx > 0;
+  const canNext = idx < periodStarts.length - 1;
+
+  return (
+    <div>
+      {/* 월 넘김 헤더 */}
+      <div
+        style={{
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+          background: 'rgba(201,162,39,0.08)', border: '1px solid rgba(201,162,39,0.2)',
+          borderRadius: '12px', padding: '0.6rem 0.9rem', marginBottom: '0.8rem',
+        }}
+      >
+        <button
+          onClick={(e) => { e.stopPropagation(); if (canPrev) setIdx(idx - 1); }}
+          disabled={!canPrev}
+          style={{
+            background: 'rgba(201,162,39,0.15)', border: '1px solid rgba(201,162,39,0.4)',
+            color: '#e8d48f', width: '38px', height: '38px', borderRadius: '10px',
+            fontSize: '1.2rem', fontWeight: 800, cursor: canPrev ? 'pointer' : 'default',
+            opacity: canPrev ? 1 : 0.25,
+          }}
+        >
+          ‹
+        </button>
+        <div style={{ textAlign: 'center' }}>
+          <div style={{ fontSize: '1.05rem', fontWeight: 800, color: '#e8d48f' }}>{period.label}</div>
+          <div style={{ fontSize: '0.7rem', color: '#8a8a82', marginTop: '2px' }}>
+            {period.start.slice(5).replace('-', '/')} ~ {period.end.slice(5).replace('-', '/')}
+          </div>
+        </div>
+        <button
+          onClick={(e) => { e.stopPropagation(); if (canNext) setIdx(idx + 1); }}
+          disabled={!canNext}
+          style={{
+            background: 'rgba(201,162,39,0.15)', border: '1px solid rgba(201,162,39,0.4)',
+            color: '#e8d48f', width: '38px', height: '38px', borderRadius: '10px',
+            fontSize: '1.2rem', fontWeight: 800, cursor: canNext ? 'pointer' : 'default',
+            opacity: canNext ? 1 : 0.25,
+          }}
+        >
+          ›
+        </button>
+      </div>
+
+      {/* 요일 헤더 */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: '5px', marginBottom: '5px' }}>
+        {dowNames.map((d, i) => (
+          <div
+            key={d}
+            style={{
+              textAlign: 'center', fontSize: '0.75rem', fontWeight: 800,
+              color: i === 0 ? '#e0574f' : i === 6 ? '#5a8ad9' : '#9a9a92',
+            }}
+          >
+            {d}
+          </div>
+        ))}
+      </div>
+
+      {/* 달력 그리드 */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: '5px' }}>
+        {cells}
+      </div>
+
+      {/* 이 달 요약 */}
+      <div
+        style={{
+          display: 'flex', justifyContent: 'space-around',
+          marginTop: '0.9rem', paddingTop: '0.9rem',
+          borderTop: '1px solid rgba(201,162,39,0.15)', textAlign: 'center',
+        }}
+      >
+        <div>
+          <div style={{ fontSize: '0.7rem', color: '#8a8a82' }}>이 달 합계</div>
+          <div style={{ fontSize: '1.1rem', fontWeight: 800, color: '#e8d48f', marginTop: '3px', fontVariantNumeric: 'tabular-nums' }}>
+            {monthTotal.toLocaleString()}
+          </div>
+        </div>
+        <div>
+          <div style={{ fontSize: '0.7rem', color: '#8a8a82' }}>근무일</div>
+          <div style={{ fontSize: '1.1rem', fontWeight: 800, color: '#e8d48f', marginTop: '3px' }}>{monthDays}일</div>
+        </div>
+        <div>
+          <div style={{ fontSize: '0.7rem', color: '#8a8a82' }}>하루 평균</div>
+          <div style={{ fontSize: '1.1rem', fontWeight: 800, color: '#e8d48f', marginTop: '3px', fontVariantNumeric: 'tabular-nums' }}>
+            {monthDays > 0 ? Math.round(monthTotal / monthDays).toLocaleString() : '-'}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function SmartTripAnalyzer() {
   const [trip1Data, setTrip1Data] = useState('');
   const [trip2Data, setTrip2Data] = useState('');
@@ -45,6 +271,9 @@ export default function SmartTripAnalyzer() {
 
   // 월간 누적 합계 상태
   const [monthlyData, setMonthlyData] = useState<any>(null);
+
+  // 오늘 분석 탭: 전체 날짜별 총 물량 (달력용)
+  const [allDatesData, setAllDatesData] = useState<{ date: string; vol: number }[]>([]);
   const [monthlyLoading, setMonthlyLoading] = useState(false);
   const [saveStatus, setSaveStatus] = useState<string>('');
 
@@ -124,6 +353,8 @@ export default function SmartTripAnalyzer() {
       } catch {}
       setLoaded(true);
     })();
+    // 전체 날짜별 총 물량도 불러오기 (달력용)
+    loadAllDates();
   }, []);
 
   // ✅ 입력값 자동 저장 (로컬)
@@ -416,6 +647,24 @@ export default function SmartTripAnalyzer() {
       setMonthlyData({ error: true });
     }
     setMonthlyLoading(false);
+  };
+
+  // ===== 전체 날짜별 총 물량 불러오기 (오늘 분석 탭 달력용) =====
+  const loadAllDates = async () => {
+    try {
+      const rows = await fetchAllRows(
+        `${SUPABASE_URL}/rest/v1/daily_volume?select=work_date,volume`
+      );
+      // 날짜별로 전체 합산 (모든 사람, 1차+2차)
+      const byDate: Record<string, number> = {};
+      rows.forEach((r: any) => {
+        byDate[r.work_date] = (byDate[r.work_date] || 0) + (r.volume || 0);
+      });
+      const arr = Object.entries(byDate).map(([date, vol]) => ({ date, vol }));
+      setAllDatesData(arr);
+    } catch {
+      // 실패 시 조용히 (달력만 안 보임)
+    }
   };
 
   // ===== 빠른 기간 설정 =====
@@ -883,6 +1132,7 @@ export default function SmartTripAnalyzer() {
     const hasTrip2ForSave = totalTrip2 > 0;
     saveToCloud(scheduleDate, sorted as [string, any][], hasTrip2ForSave).then(() => {
       loadMonthly(scheduleDate);
+      loadAllDates(); // 달력 갱신
     });
 
     // ✅ 입력 내용도 자동 공유 저장 (다른 기기에서 이어받기 가능)
@@ -1415,6 +1665,36 @@ export default function SmartTripAnalyzer() {
         {/* ===== 탭 1: 오늘 분석 ===== */}
         {activeTab === 'analyze' && (
         <div>
+        {/* 📅 전체 날짜별 총 물량 달력 */}
+        {allDatesData.length > 0 && (
+          <div
+            style={{
+              background: 'linear-gradient(160deg, #1a1710 0%, #121212 100%)',
+              border: '1px solid rgba(201,162,39,0.3)',
+              borderRadius: '18px',
+              padding: '1.2rem',
+              marginBottom: '1.5rem',
+            }}
+          >
+            <div
+              style={{
+                fontSize: '0.8rem',
+                color: '#c9a227',
+                letterSpacing: '1px',
+                marginBottom: '0.8rem',
+                fontWeight: 700,
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.4rem',
+              }}
+            >
+              <span>📅</span>
+              <span>날짜별 총 물량</span>
+            </div>
+            <BillingCalendar dates={allDatesData} />
+          </div>
+        )}
+
         {/* ✅ 입력 초기화 버튼 */}
         <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '1rem' }}>
           <button className="st-btn-reset" onClick={resetInputs}>
@@ -1935,38 +2215,14 @@ export default function SmartTripAnalyzer() {
                                 borderTop: '1px solid rgba(201,162,39,0.2)',
                               }}
                             >
-                              {/* 날짜별 물량 */}
-                              {w.dates && (
-                                <>
+                              {/* 날짜별 물량 (정산월 달력) */}
+                              {w.dates && w.dates.length > 0 && (
+                                <div onClick={(e) => e.stopPropagation()}>
                                   <div style={{ fontSize: '0.75rem', color: '#c9a227', letterSpacing: '1px', marginBottom: '0.6rem' }}>
                                     날짜별 물량
                                   </div>
-                                  <div style={{ display: 'grid', gap: '0.4rem' }}>
-                                    {w.dates.map((d: any) => {
-                                      const dt = new Date(d.date + 'T00:00:00');
-                                      const wd = ['일', '월', '화', '수', '목', '금', '토'][dt.getDay()];
-                                      const label = `${dt.getMonth() + 1}/${dt.getDate()}(${wd})`;
-                                      return (
-                                        <div
-                                          key={d.date}
-                                          style={{
-                                            display: 'flex',
-                                            justifyContent: 'space-between',
-                                            padding: '0.55rem 0.85rem',
-                                            borderRadius: '10px',
-                                            background: 'rgba(201,162,39,0.06)',
-                                            border: '1px solid rgba(201,162,39,0.12)',
-                                          }}
-                                        >
-                                          <span style={{ color: '#d8d4c8', fontWeight: 600 }}>{label}</span>
-                                          <span style={{ color: '#e8d48f', fontWeight: 800, fontVariantNumeric: 'tabular-nums' }}>
-                                            {d.vol.toLocaleString()}
-                                          </span>
-                                        </div>
-                                      );
-                                    })}
-                                  </div>
-                                </>
+                                  <BillingCalendar dates={w.dates} />
+                                </div>
                               )}
 
                               {/* 노선별 물량 */}
