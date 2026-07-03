@@ -65,7 +65,13 @@ function getBillingPeriod(dateStr: string) {
 }
 
 // 정산월 달력 컴포넌트 (26일 시작, 화살표로 월 넘김)
-function BillingCalendar({ dates }: { dates: { date: string; vol: number }[] }) {
+function BillingCalendar({
+  dates,
+  showSummary = true,
+}: {
+  dates: { date: string; vol: number }[];
+  showSummary?: boolean;
+}) {
   // 로컬 날짜를 YYYY-MM-DD로 (toISOString은 UTC 변환으로 날짜가 밀릴 수 있어 사용 안 함)
   const fmtLocal = (d: Date) =>
     `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
@@ -233,30 +239,44 @@ function BillingCalendar({ dates }: { dates: { date: string; vol: number }[] }) 
       </div>
 
       {/* 이 달 요약 */}
-      <div
-        style={{
-          display: 'flex', justifyContent: 'space-around',
-          marginTop: '0.9rem', paddingTop: '0.9rem',
-          borderTop: '1px solid rgba(201,162,39,0.15)', textAlign: 'center',
-        }}
-      >
-        <div>
-          <div style={{ fontSize: '0.7rem', color: '#8a8a82' }}>이 달 합계</div>
-          <div style={{ fontSize: '1.1rem', fontWeight: 800, color: '#e8d48f', marginTop: '3px', fontVariantNumeric: 'tabular-nums' }}>
+      {showSummary ? (
+        <div
+          style={{
+            display: 'flex', justifyContent: 'space-around',
+            marginTop: '0.9rem', paddingTop: '0.9rem',
+            borderTop: '1px solid rgba(201,162,39,0.15)', textAlign: 'center',
+          }}
+        >
+          <div>
+            <div style={{ fontSize: '0.7rem', color: '#8a8a82' }}>이 달 합계</div>
+            <div style={{ fontSize: '1.1rem', fontWeight: 800, color: '#e8d48f', marginTop: '3px', fontVariantNumeric: 'tabular-nums' }}>
+              {monthTotal.toLocaleString()}
+            </div>
+          </div>
+          <div>
+            <div style={{ fontSize: '0.7rem', color: '#8a8a82' }}>근무일</div>
+            <div style={{ fontSize: '1.1rem', fontWeight: 800, color: '#e8d48f', marginTop: '3px' }}>{monthDays}일</div>
+          </div>
+          <div>
+            <div style={{ fontSize: '0.7rem', color: '#8a8a82' }}>하루 평균</div>
+            <div style={{ fontSize: '1.1rem', fontWeight: 800, color: '#e8d48f', marginTop: '3px', fontVariantNumeric: 'tabular-nums' }}>
+              {monthDays > 0 ? Math.round(monthTotal / monthDays).toLocaleString() : '-'}
+            </div>
+          </div>
+        </div>
+      ) : (
+        <div
+          style={{
+            marginTop: '0.9rem', paddingTop: '0.9rem',
+            borderTop: '1px solid rgba(201,162,39,0.15)', textAlign: 'center',
+          }}
+        >
+          <div style={{ fontSize: '0.72rem', color: '#8a8a82' }}>이 달 합계</div>
+          <div style={{ fontSize: '1.6rem', fontWeight: 800, color: '#e8d48f', marginTop: '3px', fontVariantNumeric: 'tabular-nums' }}>
             {monthTotal.toLocaleString()}
           </div>
         </div>
-        <div>
-          <div style={{ fontSize: '0.7rem', color: '#8a8a82' }}>근무일</div>
-          <div style={{ fontSize: '1.1rem', fontWeight: 800, color: '#e8d48f', marginTop: '3px' }}>{monthDays}일</div>
-        </div>
-        <div>
-          <div style={{ fontSize: '0.7rem', color: '#8a8a82' }}>하루 평균</div>
-          <div style={{ fontSize: '1.1rem', fontWeight: 800, color: '#e8d48f', marginTop: '3px', fontVariantNumeric: 'tabular-nums' }}>
-            {monthDays > 0 ? Math.round(monthTotal / monthDays).toLocaleString() : '-'}
-          </div>
-        </div>
-      </div>
+      )}
     </div>
   );
 }
@@ -1691,7 +1711,7 @@ export default function SmartTripAnalyzer() {
               <span>📅</span>
               <span>날짜별 총 물량</span>
             </div>
-            <BillingCalendar dates={allDatesData} />
+            <BillingCalendar dates={allDatesData} showSummary={false} />
           </div>
         )}
 
