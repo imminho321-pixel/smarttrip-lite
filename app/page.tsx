@@ -35,6 +35,14 @@ const HOLIDAYS: Record<string, string> = {
   '2030-10-03': '개천절', '2030-10-09': '한글날', '2030-12-25': '크리스마스',
 };
 
+// 사람별 고정 과일 이모지 (4등 이하일 때 이름 앞에 표시)
+const WORKER_EMOJI: Record<string, string> = {
+  '이다운': '🍒', '김지혜': '🍓', '임태학': '🍎', '임민호': '🍊',
+  '유윤석': '🍇', '임동명': '🍌', '이상윤': '🥝', '성백은': '🍑',
+  '김진우': '🍈', '문정학': '🥭', '현석': '🍍', '김주표': '🥥',
+  '김경훈': '🍐', '이태영': '🥑', '김정우': '🍋',
+};
+
 // 정산 기간 계산: 어떤 날짜가 속한 26일~다음달25일 기간 반환
 function getBillingPeriod(dateStr: string) {
   const d = new Date(dateStr + 'T00:00:00');
@@ -57,10 +65,15 @@ function getBillingPeriod(dateStr: string) {
     const dd = String(dt.getDate()).padStart(2, '0');
     return `${y}-${m}-${dd}`;
   };
+  // 정산월 이름 = 종료일이 속한 달 기준 (6/26~7/25 → "7월 정산")
+  // 하준님 회사: 7/25까지 물량을 그 다음 달에 급여로 받으므로 종료월로 표기
+  const endDate = new Date(startYear, startMonth + 1, 25);
+  const labelYear = endDate.getFullYear();
+  const labelMonth = endDate.getMonth() + 1;
   return {
     start: fmt(start),
     end: fmt(end),
-    label: `${startYear}년 ${startMonth + 1}월 정산`,
+    label: `${labelYear}년 ${labelMonth}월 정산`,
   };
 }
 
@@ -69,14 +82,27 @@ function BillingCalendar({
   dates,
   showSummary = true,
   detailLabel,
+  colorByVolume = false,
 }: {
   dates: { date: string; vol: number; routes?: { route: string; vol: number }[]; workers?: { name: string; vol: number }[] }[];
   showSummary?: boolean;
   detailLabel?: 'route' | 'worker'; // 날짜 클릭 시 상세 종류 (route=노선별, worker=담당자별)
+  colorByVolume?: boolean; // 물량에 따라 박스 색 (전체 물량 달력용)
 }) {
   // 로컬 날짜를 YYYY-MM-DD로 (toISOString은 UTC 변환으로 날짜가 밀릴 수 있어 사용 안 함)
   const fmtLocal = (d: Date) =>
     `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+
+  // 물량별 박스 색 (colorByVolume일 때만): 하(노랑)/중(초록)/상(주황)/최상(빨강)
+  const volStyle = (v: number): { bg: string; color: string } => {
+    if (!colorByVolume) {
+      return { bg: 'linear-gradient(135deg, #e8d48f, #c9a227)', color: '#1a1407' }; // 기본 금색
+    }
+    if (v < 4000) return { bg: 'linear-gradient(135deg, #e8d48f, #c9a227)', color: '#3a2f07' }; // 하 - 금/노랑
+    if (v < 4500) return { bg: 'linear-gradient(135deg, #9ed488, #6a9e52)', color: '#12300a' }; // 중 - 초록
+    if (v < 5000) return { bg: 'linear-gradient(135deg, #eaa866, #c47e2c)', color: '#3a2007' }; // 상 - 주황
+    return { bg: 'linear-gradient(135deg, #e88072, #c44432)', color: '#3a0a07' }; // 최상 - 빨강
+  };
 
   const displayNm = (n: string) => (n === '김대원' ? '대원♡빛나' : n);
 
@@ -148,7 +174,8 @@ function BillingCalendar({
         style={{
           aspectRatio: '0.8 / 1',
           borderRadius: '10px',
-          padding: '0.35rem 0.1rem 0.3rem',
+          padding: '0.35rem 0.15rem 0.3rem',
+          boxSizing: 'border-box',
           display: 'flex', flexDirection: 'column',
           alignItems: 'center', justifyContent: 'space-between',
           position: 'relative',
@@ -178,16 +205,19 @@ function BillingCalendar({
         {vol ? (
           <div
             style={{
-              fontSize: '0.82rem', fontWeight: 800, color: '#1a1407',
-              background: 'linear-gradient(135deg, #e8d48f, #c9a227)',
-              borderRadius: '6px', padding: '2px 3px', minWidth: '85%',
+              fontSize: '0.72rem', fontWeight: 800,
+              color: volStyle(vol).color,
+              background: volStyle(vol).bg,
+              borderRadius: '5px', padding: '2px 0',
+              width: '100%', maxWidth: '100%',
               textAlign: 'center', fontVariantNumeric: 'tabular-nums', lineHeight: 1.2,
+              overflow: 'hidden', whiteSpace: 'nowrap',
             }}
           >
             {vol.toLocaleString()}
           </div>
         ) : (
-          <div style={{ height: '20px' }} />
+          <div style={{ height: '18px' }} />
         )}
       </div>
     );
@@ -296,6 +326,30 @@ function BillingCalendar({
               </span>
             ))}
           </div>
+        </div>
+      )}
+
+      {/* 물량 색 범례 (colorByVolume일 때만) */}
+      {colorByVolume && (
+        <div
+          style={{
+            display: 'flex', flexWrap: 'wrap', gap: '0.9rem',
+            justifyContent: 'center', alignItems: 'center',
+            marginTop: '0.9rem', paddingTop: '0.9rem',
+            borderTop: '1px solid rgba(201,162,39,0.15)',
+          }}
+        >
+          {[
+            { label: '하', bg: 'linear-gradient(135deg, #e8d48f, #c9a227)' },
+            { label: '중', bg: 'linear-gradient(135deg, #9ed488, #6a9e52)' },
+            { label: '상', bg: 'linear-gradient(135deg, #eaa866, #c47e2c)' },
+            { label: '최상', bg: 'linear-gradient(135deg, #e88072, #c44432)' },
+          ].map((it) => (
+            <div key={it.label} style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+              <div style={{ width: '16px', height: '16px', borderRadius: '4px', background: it.bg }} />
+              <span style={{ fontSize: '0.8rem', color: '#b8b4a8', fontWeight: 700 }}>{it.label}</span>
+            </div>
+          ))}
         </div>
       )}
 
@@ -1304,18 +1358,36 @@ export default function SmartTripAnalyzer() {
 
     // 복사 텍스트에도 표시 이름 적용 (김대원 → 대원♡빛나)
     result.workers.forEach(([worker, data]: any, index: number) => {
-      let emoji = index === 0 ? '👑' : index === 1 ? '🥈' : index === 2 ? '🥉' : '👤';
-      // 대원빛나(김대원)는 메달권(1~3위)이 아닐 때 오이 이모지로
-      if (worker === '김대원' && index >= 3) emoji = '🥒';
+      const isMedal = index < 3; // 1,2,3등
       const trip2Ratio =
         hasTrip2 && data.total > 0 ? ((data.trip2 / data.total) * 100).toFixed(2) : '0.00';
       const displayVolume = hasTrip2 ? data.trip2 : data.trip1;
       const nameForCopy = displayName(worker);
-      // 대원빛나(김대원)는 이름 뒤에 수박 이모지도 추가
-      const nameWithSuffix = worker === '김대원' ? nameForCopy + ' 🍉' : nameForCopy;
+
+      // 이름 앞뒤 조립
+      let line = '';
+      if (worker === '김대원') {
+        // 김대원(대원♡빛나) 특별 규칙
+        if (isMedal) {
+          // 1,2,3등이면 메달만 (다른 사람과 동일)
+          const medal = index === 0 ? '👑' : index === 1 ? '🥈' : '🥉';
+          line = medal + ' ' + nameForCopy;
+        } else {
+          // 4등 이하면 오이수박 + 이름 + 복어굴
+          line = '🥒🍉 ' + nameForCopy + ' 🐡🦪';
+        }
+      } else if (isMedal) {
+        // 일반 1,2,3등 → 메달만
+        const medal = index === 0 ? '👑' : index === 1 ? '🥈' : '🥉';
+        line = medal + ' ' + nameForCopy;
+      } else {
+        // 일반 4등 이하 → 과일 (명단에 없는 새 사람은 사람 이모지)
+        const fruit = WORKER_EMOJI[worker] || '👤';
+        line = fruit + ' ' + nameForCopy;
+      }
 
       // 이름 + 합계 (한 줄)
-      text += emoji + ' ' + nameWithSuffix + ' (합계: ' + displayVolume + ')\n';
+      text += line + ' (합계: ' + displayVolume + ')\n';
       // 비율은 다음 줄로 (핸드폰에서 줄바꿈 깨짐 방지)
       if (hasTrip2) {
         text += '   └ 비율 ' + trip2Ratio + '%\n';
@@ -1800,7 +1872,7 @@ export default function SmartTripAnalyzer() {
               <span>📅</span>
               <span>날짜별 총 물량</span>
             </div>
-            <BillingCalendar dates={allDatesData} showSummary={false} />
+            <BillingCalendar dates={allDatesData} showSummary={false} colorByVolume={true} />
           </div>
         )}
 
