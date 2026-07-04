@@ -357,7 +357,8 @@ function BillingCalendar({
           {(() => {
             const t = tripMap[openDate];
             const total = t.trip1 + t.trip2;
-            const ratio = total > 0 ? ((t.trip2 / total) * 100).toFixed(1) : '0.0';
+            const ratio1 = total > 0 ? ((t.trip1 / total) * 100).toFixed(1) : '0.0';
+            const ratio2 = total > 0 ? ((t.trip2 / total) * 100).toFixed(1) : '0.0';
             const hasTrip2 = t.trip2 > 0;
             return (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
@@ -382,8 +383,11 @@ function BillingCalendar({
                   </div>
                 </div>
                 {hasTrip2 && (
-                  <div style={{ textAlign: 'center', fontSize: '0.82rem', color: '#b8b4a8' }}>
-                    2차 비율 <b style={{ color: '#e8d48f' }}>{ratio}%</b>
+                  <div style={{ textAlign: 'center', marginTop: '0.2rem' }}>
+                    <div style={{ fontSize: '0.72rem', color: '#8a8a82' }}>비율</div>
+                    <div style={{ fontSize: '0.95rem', fontWeight: 800, color: '#e8d48f', marginTop: '2px', fontVariantNumeric: 'tabular-nums' }}>
+                      {ratio1}% / {ratio2}%
+                    </div>
                   </div>
                 )}
               </div>
