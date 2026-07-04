@@ -83,11 +83,13 @@ function BillingCalendar({
   showSummary = true,
   detailLabel,
   colorByVolume = false,
+  showTripSummary = false,
 }: {
-  dates: { date: string; vol: number; routes?: { route: string; vol: number }[]; workers?: { name: string; vol: number }[] }[];
+  dates: { date: string; vol: number; routes?: { route: string; vol: number }[]; workers?: { name: string; vol: number }[]; trip1?: number; trip2?: number }[];
   showSummary?: boolean;
   detailLabel?: 'route' | 'worker'; // 날짜 클릭 시 상세 종류 (route=노선별, worker=담당자별)
   colorByVolume?: boolean; // 물량에 따라 박스 색 (전체 물량 달력용)
+  showTripSummary?: boolean; // 날짜 클릭 시 1차/2차 요약 (전체 물량 달력용)
 }) {
   // 로컬 날짜를 YYYY-MM-DD로 (toISOString은 UTC 변환으로 날짜가 밀릴 수 있어 사용 안 함)
   const fmtLocal = (d: Date) =>
@@ -109,10 +111,14 @@ function BillingCalendar({
   // 날짜별 물량 + 상세를 map으로
   const volMap: Record<string, number> = {};
   const detailMap: Record<string, { route: string; vol: number }[] | { name: string; vol: number }[]> = {};
+  const tripMap: Record<string, { trip1: number; trip2: number }> = {};
   dates.forEach((d) => {
     volMap[d.date] = d.vol;
     if (d.routes) detailMap[d.date] = d.routes;
     else if (d.workers) detailMap[d.date] = d.workers;
+    if (d.trip1 !== undefined || d.trip2 !== undefined) {
+      tripMap[d.date] = { trip1: d.trip1 || 0, trip2: d.trip2 || 0 };
+    }
   });
 
   // 클릭해서 상세 펼친 날짜
@@ -164,7 +170,7 @@ function BillingCalendar({
     const isBlue = dow === 6 && !holiday;
     const dateColor = isRed ? '#e0574f' : isBlue ? '#5a8ad9' : vol ? '#e8d48f' : '#7a7a72';
 
-    const hasDetail = !!vol && !!detailLabel && !!detailMap[key];
+    const hasDetail = !!vol && ((!!detailLabel && !!detailMap[key]) || (showTripSummary && !!tripMap[key]));
     const isOpen = openDate === key;
 
     cells.push(
@@ -329,6 +335,63 @@ function BillingCalendar({
         </div>
       )}
 
+      {/* 선택한 날 1차/2차 요약 (전체 물량 달력용) */}
+      {openDate && showTripSummary && tripMap[openDate] && (
+        <div
+          style={{
+            marginTop: '0.9rem',
+            padding: '1rem',
+            borderRadius: '12px',
+            background: 'rgba(201,162,39,0.08)',
+            border: '1px solid rgba(201,162,39,0.3)',
+          }}
+        >
+          <div style={{ fontSize: '0.85rem', color: '#e8d48f', fontWeight: 700, marginBottom: '0.8rem' }}>
+            {(() => {
+              const dt = new Date(openDate + 'T00:00:00');
+              const wd = ['일', '월', '화', '수', '목', '금', '토'][dt.getDay()];
+              const hol = HOLIDAYS[openDate];
+              return `${dt.getMonth() + 1}/${dt.getDate()}(${wd})${hol ? ' · ' + hol : ''}`;
+            })()}
+          </div>
+          {(() => {
+            const t = tripMap[openDate];
+            const total = t.trip1 + t.trip2;
+            const ratio = total > 0 ? ((t.trip2 / total) * 100).toFixed(1) : '0.0';
+            const hasTrip2 = t.trip2 > 0;
+            return (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                <div style={{ display: 'flex', gap: '0.5rem' }}>
+                  <div style={{ flex: 1, background: 'rgba(0,0,0,0.3)', borderRadius: '8px', padding: '0.6rem', textAlign: 'center', border: '1px solid rgba(201,162,39,0.2)' }}>
+                    <div style={{ fontSize: '0.72rem', color: '#8a8a82' }}>1차</div>
+                    <div style={{ fontSize: '1.1rem', fontWeight: 800, color: '#e8d48f', marginTop: '2px', fontVariantNumeric: 'tabular-nums' }}>
+                      {t.trip1.toLocaleString()}
+                    </div>
+                  </div>
+                  <div style={{ flex: 1, background: 'rgba(0,0,0,0.3)', borderRadius: '8px', padding: '0.6rem', textAlign: 'center', border: '1px solid rgba(201,162,39,0.2)' }}>
+                    <div style={{ fontSize: '0.72rem', color: '#8a8a82' }}>2차</div>
+                    <div style={{ fontSize: '1.1rem', fontWeight: 800, color: hasTrip2 ? '#e8d48f' : '#6a6a62', marginTop: '2px', fontVariantNumeric: 'tabular-nums' }}>
+                      {hasTrip2 ? t.trip2.toLocaleString() : '없음'}
+                    </div>
+                  </div>
+                  <div style={{ flex: 1, background: 'rgba(0,0,0,0.3)', borderRadius: '8px', padding: '0.6rem', textAlign: 'center', border: '1px solid rgba(201,162,39,0.2)' }}>
+                    <div style={{ fontSize: '0.72rem', color: '#8a8a82' }}>총합</div>
+                    <div style={{ fontSize: '1.1rem', fontWeight: 800, color: '#e8d48f', marginTop: '2px', fontVariantNumeric: 'tabular-nums' }}>
+                      {total.toLocaleString()}
+                    </div>
+                  </div>
+                </div>
+                {hasTrip2 && (
+                  <div style={{ textAlign: 'center', fontSize: '0.82rem', color: '#b8b4a8' }}>
+                    2차 비율 <b style={{ color: '#e8d48f' }}>{ratio}%</b>
+                  </div>
+                )}
+              </div>
+            );
+          })()}
+        </div>
+      )}
+
       {/* 물량 색 범례 (colorByVolume일 때만) */}
       {colorByVolume && (
         <div
@@ -408,7 +471,7 @@ export default function SmartTripAnalyzer() {
   const [monthlyData, setMonthlyData] = useState<any>(null);
 
   // 오늘 분석 탭: 전체 날짜별 총 물량 (달력용)
-  const [allDatesData, setAllDatesData] = useState<{ date: string; vol: number }[]>([]);
+  const [allDatesData, setAllDatesData] = useState<{ date: string; vol: number; trip1?: number; trip2?: number }[]>([]);
   const [monthlyLoading, setMonthlyLoading] = useState(false);
   const [saveStatus, setSaveStatus] = useState<string>('');
 
@@ -788,14 +851,22 @@ export default function SmartTripAnalyzer() {
   const loadAllDates = async () => {
     try {
       const rows = await fetchAllRows(
-        `${SUPABASE_URL}/rest/v1/daily_volume?select=work_date,volume`
+        `${SUPABASE_URL}/rest/v1/daily_volume?select=work_date,volume,trip`
       );
-      // 날짜별로 전체 합산 (모든 사람, 1차+2차)
-      const byDate: Record<string, number> = {};
+      // 날짜별로 총합 + 1차/2차 나눠서 집계
+      const byDate: Record<string, { vol: number; trip1: number; trip2: number }> = {};
       rows.forEach((r: any) => {
-        byDate[r.work_date] = (byDate[r.work_date] || 0) + (r.volume || 0);
+        if (!byDate[r.work_date]) byDate[r.work_date] = { vol: 0, trip1: 0, trip2: 0 };
+        byDate[r.work_date].vol += r.volume || 0;
+        if (r.trip === 2) byDate[r.work_date].trip2 += r.volume || 0;
+        else byDate[r.work_date].trip1 += r.volume || 0; // trip=1 또는 null은 1차로
       });
-      const arr = Object.entries(byDate).map(([date, vol]) => ({ date, vol }));
+      const arr = Object.entries(byDate).map(([date, d]) => ({
+        date,
+        vol: d.vol,
+        trip1: d.trip1,
+        trip2: d.trip2,
+      }));
       setAllDatesData(arr);
     } catch {
       // 실패 시 조용히 (달력만 안 보임)
@@ -1872,7 +1943,7 @@ export default function SmartTripAnalyzer() {
               <span>📅</span>
               <span>날짜별 총 물량</span>
             </div>
-            <BillingCalendar dates={allDatesData} showSummary={false} colorByVolume={true} />
+            <BillingCalendar dates={allDatesData} showSummary={false} colorByVolume={true} showTripSummary={true} />
           </div>
         )}
 
