@@ -85,7 +85,7 @@ function BillingCalendar({
   colorByVolume = false,
   showTripSummary = false,
 }: {
-  dates: { date: string; vol: number; routes?: { route: string; vol: number }[]; workers?: { name: string; vol: number }[]; trip1?: number; trip2?: number }[];
+  dates: { date: string; vol: number; routes?: { route: string; vol: number }[]; workers?: { name: string; vol: number }[]; trip1?: number; trip2?: number; trip1Time?: string; trip2Time?: string }[];
   showSummary?: boolean;
   detailLabel?: 'route' | 'worker'; // 날짜 클릭 시 상세 종류 (route=노선별, worker=담당자별)
   colorByVolume?: boolean; // 물량에 따라 박스 색 (전체 물량 달력용)
@@ -111,13 +111,13 @@ function BillingCalendar({
   // 날짜별 물량 + 상세를 map으로
   const volMap: Record<string, number> = {};
   const detailMap: Record<string, { route: string; vol: number }[] | { name: string; vol: number }[]> = {};
-  const tripMap: Record<string, { trip1: number; trip2: number }> = {};
+  const tripMap: Record<string, { trip1: number; trip2: number; trip1Time: string; trip2Time: string }> = {};
   dates.forEach((d) => {
     volMap[d.date] = d.vol;
     if (d.routes) detailMap[d.date] = d.routes;
     else if (d.workers) detailMap[d.date] = d.workers;
     if (d.trip1 !== undefined || d.trip2 !== undefined) {
-      tripMap[d.date] = { trip1: d.trip1 || 0, trip2: d.trip2 || 0 };
+      tripMap[d.date] = { trip1: d.trip1 || 0, trip2: d.trip2 || 0, trip1Time: d.trip1Time || '', trip2Time: d.trip2Time || '' };
     }
   });
 
@@ -368,12 +368,22 @@ function BillingCalendar({
                     <div style={{ fontSize: '1.1rem', fontWeight: 800, color: '#e8d48f', marginTop: '2px', fontVariantNumeric: 'tabular-nums' }}>
                       {t.trip1.toLocaleString()}
                     </div>
+                    {t.trip1Time && (
+                      <div style={{ fontSize: '0.7rem', fontWeight: 700, color: '#7fc8e8', marginTop: '2px' }}>
+                        🕐 {t.trip1Time}
+                      </div>
+                    )}
                   </div>
                   <div style={{ flex: 1, background: 'rgba(0,0,0,0.3)', borderRadius: '8px', padding: '0.6rem', textAlign: 'center', border: '1px solid rgba(201,162,39,0.2)' }}>
                     <div style={{ fontSize: '0.72rem', color: '#8a8a82' }}>2차</div>
                     <div style={{ fontSize: '1.1rem', fontWeight: 800, color: hasTrip2 ? '#e8d48f' : '#6a6a62', marginTop: '2px', fontVariantNumeric: 'tabular-nums' }}>
                       {hasTrip2 ? t.trip2.toLocaleString() : '없음'}
                     </div>
+                    {hasTrip2 && t.trip2Time && (
+                      <div style={{ fontSize: '0.7rem', fontWeight: 700, color: '#7fc8e8', marginTop: '2px' }}>
+                        🕐 {t.trip2Time}
+                      </div>
+                    )}
                   </div>
                   <div style={{ flex: 1, background: 'rgba(0,0,0,0.3)', borderRadius: '8px', padding: '0.6rem', textAlign: 'center', border: '1px solid rgba(201,162,39,0.2)' }}>
                     <div style={{ fontSize: '0.72rem', color: '#8a8a82' }}>총합</div>
@@ -475,7 +485,7 @@ export default function SmartTripAnalyzer() {
   const [monthlyData, setMonthlyData] = useState<any>(null);
 
   // 오늘 분석 탭: 전체 날짜별 총 물량 (달력용)
-  const [allDatesData, setAllDatesData] = useState<{ date: string; vol: number; trip1?: number; trip2?: number }[]>([]);
+  const [allDatesData, setAllDatesData] = useState<{ date: string; vol: number; trip1?: number; trip2?: number; trip1Time?: string; trip2Time?: string }[]>([]);
   const [monthlyLoading, setMonthlyLoading] = useState(false);
   const [saveStatus, setSaveStatus] = useState<string>('');
 
@@ -708,6 +718,33 @@ export default function SmartTripAnalyzer() {
   ) => {
     setSaveStatus('saving');
     try {
+      // 0) 현재 시간 -5분을 "HH:MM"으로 (소분 종료 시간 추정)
+      const now = new Date();
+      now.setMinutes(now.getMinutes() - 5);
+      const nowTime = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+
+      // 0-1) 기존에 저장된 이 날짜의 1차/2차 시간 조회 (재분석 시 유지용)
+      let existingTrip1Time = '';
+      let existingTrip2Time = '';
+      try {
+        const exRows = await fetchAllRows(
+          `${SUPABASE_URL}/rest/v1/daily_volume?work_date=eq.${workDate}&select=trip,trip1_time,trip2_time`
+        );
+        exRows.forEach((r: any) => {
+          if (r.trip1_time) existingTrip1Time = r.trip1_time;
+          if (r.trip2_time) existingTrip2Time = r.trip2_time;
+        });
+      } catch {}
+
+      // 이번 분석에서 1차/2차가 각각 있는지
+      const hasTrip1Now = workers.some(([, d]) => d.trip1 > 0);
+      const hasTrip2Now = workers.some(([, d]) => d.trip2 > 0);
+
+      // 1차 시간: 기존에 있으면 유지, 없으면 이번 분석 시간
+      const trip1Time = existingTrip1Time || (hasTrip1Now ? nowTime : '');
+      // 2차 시간: 기존에 있으면 유지, 없고 이번에 2차가 있으면 이번 분석 시간
+      const trip2Time = existingTrip2Time || (hasTrip2Now ? nowTime : '');
+
       // 1) 같은 날짜 기존 데이터 먼저 삭제 (덮어쓰기 = 중복 방지)
       await fetch(`${SUPABASE_URL}/rest/v1/daily_volume?work_date=eq.${workDate}`, {
         method: 'DELETE',
@@ -724,7 +761,7 @@ export default function SmartTripAnalyzer() {
         },
       });
 
-      // 2-1) 사람별 총합 삽입 (1차/2차 분리 저장)
+      // 2-1) 사람별 총합 삽입 (1차/2차 분리 저장 + 시간 기록)
       const rows: any[] = [];
       workers.forEach(([worker, data]) => {
         // 1차가 있으면 trip=1로 저장
@@ -734,6 +771,8 @@ export default function SmartTripAnalyzer() {
             worker_name: worker,
             volume: data.trip1,
             trip: 1,
+            trip1_time: trip1Time,
+            trip2_time: trip2Time,
           });
         }
         // 2차가 있으면 trip=2로 저장
@@ -743,6 +782,8 @@ export default function SmartTripAnalyzer() {
             worker_name: worker,
             volume: data.trip2,
             trip: 2,
+            trip1_time: trip1Time,
+            trip2_time: trip2Time,
           });
         }
       });
@@ -855,21 +896,25 @@ export default function SmartTripAnalyzer() {
   const loadAllDates = async () => {
     try {
       const rows = await fetchAllRows(
-        `${SUPABASE_URL}/rest/v1/daily_volume?select=work_date,volume,trip`
+        `${SUPABASE_URL}/rest/v1/daily_volume?select=work_date,volume,trip,trip1_time,trip2_time`
       );
-      // 날짜별로 총합 + 1차/2차 나눠서 집계
-      const byDate: Record<string, { vol: number; trip1: number; trip2: number }> = {};
+      // 날짜별로 총합 + 1차/2차 나눠서 집계 + 시간
+      const byDate: Record<string, { vol: number; trip1: number; trip2: number; t1time: string; t2time: string }> = {};
       rows.forEach((r: any) => {
-        if (!byDate[r.work_date]) byDate[r.work_date] = { vol: 0, trip1: 0, trip2: 0 };
+        if (!byDate[r.work_date]) byDate[r.work_date] = { vol: 0, trip1: 0, trip2: 0, t1time: '', t2time: '' };
         byDate[r.work_date].vol += r.volume || 0;
         if (r.trip === 2) byDate[r.work_date].trip2 += r.volume || 0;
         else byDate[r.work_date].trip1 += r.volume || 0; // trip=1 또는 null은 1차로
+        if (r.trip1_time) byDate[r.work_date].t1time = r.trip1_time;
+        if (r.trip2_time) byDate[r.work_date].t2time = r.trip2_time;
       });
       const arr = Object.entries(byDate).map(([date, d]) => ({
         date,
         vol: d.vol,
         trip1: d.trip1,
         trip2: d.trip2,
+        trip1Time: d.t1time,
+        trip2Time: d.t2time,
       }));
       setAllDatesData(arr);
     } catch {
