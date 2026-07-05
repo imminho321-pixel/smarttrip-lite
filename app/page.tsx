@@ -106,7 +106,7 @@ function BillingCalendar({
     return { bg: 'linear-gradient(135deg, #e88072, #c44432)', color: '#3a0a07' }; // 최상 - 빨강
   };
 
-  const displayNm = (n: string) => (n === '김대원' ? '대원♡빛나' : n);
+  const displayNm = (n: string) => (n === '김대원' ? '빛나는대원' : n);
 
   // 날짜별 물량 + 상세를 map으로
   const volMap: Record<string, number> = {};
@@ -523,7 +523,7 @@ export default function SmartTripAnalyzer() {
 
   // ✅ 이름 표시 변환 (화면에만 적용, 복사는 원래 이름 유지)
   const displayName = (name: string) => {
-    if (name === '김대원') return '대원♡빛나';
+    if (name === '김대원') return '빛나는대원';
     return name;
   };
 
@@ -1156,7 +1156,7 @@ export default function SmartTripAnalyzer() {
     text += '총 수량: ' + workerSearchResult.grandTotal.toLocaleString() + '\n\n';
     workerSearchResult.workers.forEach((w: any, idx: number) => {
       const emoji = idx === 0 ? '👑' : idx === 1 ? '🥈' : idx === 2 ? '🥉' : '👤';
-      const nm = w.name === '김대원' ? '대원♡빛나' : w.name;
+      const nm = w.name === '김대원' ? '빛나는대원' : w.name;
       text += emoji + ' ' + nm + ' (' + w.total.toLocaleString() + ') · ' + w.days + '일 근무\n';
       w.routes.forEach((r: any) => {
         text += '  ∙ ' + r.route + ' (' + r.vol + ')\n';
@@ -1178,7 +1178,7 @@ export default function SmartTripAnalyzer() {
     routeSearchResult.routes.forEach((r: any) => {
       text += r.route + ' (' + r.total.toLocaleString() + ') · ' + r.days + '일 운영\n';
       r.workers.forEach((w: any) => {
-        const nm = w.name === '김대원' ? '대원♡빛나' : w.name;
+        const nm = w.name === '김대원' ? '빛나는대원' : w.name;
         text += '  ∙ ' + nm + ' (' + w.vol + ')\n';
       });
       text += '\n';
@@ -1476,7 +1476,7 @@ export default function SmartTripAnalyzer() {
       text += '📦 총 수량: ' + displayTotal.toLocaleString() + '\n\n';
     }
 
-    // 복사 텍스트에도 표시 이름 적용 (김대원 → 대원♡빛나)
+    // 복사 텍스트에도 표시 이름 적용 (김대원 → 빛나는대원)
     result.workers.forEach(([worker, data]: any, index: number) => {
       const isMedal = index < 3; // 1,2,3등
       const trip2Ratio =
@@ -1487,7 +1487,7 @@ export default function SmartTripAnalyzer() {
       // 이름 앞뒤 조립
       let line = '';
       if (worker === '김대원') {
-        // 김대원(대원♡빛나) 특별 규칙
+        // 김대원(빛나는대원) 특별 규칙
         if (isMedal) {
           // 1,2,3등이면 메달만 (다른 사람과 동일)
           const medal = index === 0 ? '👑' : index === 1 ? '🥈' : '🥉';
@@ -2159,9 +2159,7 @@ export default function SmartTripAnalyzer() {
                       <div className={'st-rank-badge ' + badgeClass}>{index + 1}</div>
                       <div className="st-rank-name">
                         {worker === '김대원' ? (
-                          <>
-                            대원<span style={{ color: '#c9a227' }}>♡</span>빛나
-                          </>
+                          <>빛나는대원</>
                         ) : (
                           shownName
                         )}
@@ -2322,9 +2320,7 @@ export default function SmartTripAnalyzer() {
                               <div className={'st-rank-badge ' + badgeClass}>{idx + 1}</div>
                               <div className="st-rank-name">
                                 {w.name === '김대원' ? (
-                                  <>
-                                    대원<span style={{ color: '#c9a227' }}>♡</span>빛나
-                                  </>
+                                  <>빛나는대원</>
                                 ) : (
                                   w.name
                                 )}
@@ -2469,7 +2465,7 @@ export default function SmartTripAnalyzer() {
                             <div className={'st-rank-badge ' + badgeClass}>{idx + 1}</div>
                             <div className="st-rank-name">
                               {w.name === '김대원' ? (
-                                <>대원<span style={{ color: '#c9a227' }}>♡</span>빛나</>
+                                <>빛나는대원</>
                               ) : (
                                 w.name
                               )}
@@ -2717,7 +2713,7 @@ export default function SmartTripAnalyzer() {
                               <div className="st-detail-routes" style={{ marginTop: 0 }}>
                                 {r.workers.map((w: any) => (
                                   <span key={w.name} className="st-chip">
-                                    {w.name === '김대원' ? '대원♡빛나' : w.name}
+                                    {w.name === '김대원' ? '빛나는대원' : w.name}
                                     <b>{w.vol.toLocaleString()}</b>
                                   </span>
                                 ))}
@@ -2905,7 +2901,7 @@ export default function SmartTripAnalyzer() {
                     <div key={w.name} className="st-rank-card" style={{ padding: '0.9rem 1.2rem' }}>
                       <div className="st-rank-row">
                         <div className="st-rank-name" style={{ fontSize: '1.1rem' }}>
-                          {w.name === '김대원' ? '대원♡빛나' : w.name}
+                          {w.name === '김대원' ? '빛나는대원' : w.name}
                         </div>
                         <div className="st-rank-vol" style={{ fontSize: '1.4rem' }}>
                           {w.volume.toLocaleString()}
