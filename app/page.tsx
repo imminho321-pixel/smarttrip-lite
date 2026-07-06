@@ -37,7 +37,7 @@ const HOLIDAYS: Record<string, string> = {
 
 // 사람별 고정 과일 이모지 (4등 이하일 때 이름 앞에 표시)
 const WORKER_EMOJI: Record<string, string> = {
-  '이다운': '🍒', '김지혜': '🍓', '임태학': '🍎', '임민호': '🍊',
+  '이다운': '🍒', '김지혜': '🍓', '임태학': '🫐', '임민호': '🍊',
   '유윤석': '🍇', '임동명': '🍌', '이상윤': '🥝', '성백은': '🍑',
   '김진우': '🍈', '문정학': '🥭', '현석': '🍍', '김주표': '🥥',
   '김경훈': '🍐', '이태영': '🥑', '김정우': '🍋',
@@ -1494,7 +1494,7 @@ export default function SmartTripAnalyzer() {
           line = medal + ' ' + nameForCopy;
         } else {
           // 4등 이하면 오이수박 + 이름 + 복어굴
-          line = '🥒🍉 빛나는대원 🕷️🦪';
+          line = '🍎 빛나는대원 🍏';
         }
       } else if (isMedal) {
         // 일반 1,2,3등 → 메달만
