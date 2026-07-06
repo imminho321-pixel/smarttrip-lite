@@ -1494,7 +1494,7 @@ export default function SmartTripAnalyzer() {
           line = medal + ' ' + nameForCopy;
         } else {
           // 4등 이하면 오이수박 + 이름 + 복어굴
-          line = '🍎 빛나는대원 🍏';
+          line = '🐶 빛나는대원 🐾';
         }
       } else if (isMedal) {
         // 일반 1,2,3등 → 메달만
