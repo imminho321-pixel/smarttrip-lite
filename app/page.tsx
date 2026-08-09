@@ -38,10 +38,42 @@ const HOLIDAYS: Record<string, string> = {
 // 사람별 고정 과일 이모지 (4등 이하일 때 이름 앞에 표시)
 const WORKER_EMOJI: Record<string, string> = {
   '이다운': '🍒', '김지혜': '🍓', '임태학': '🫐', '임민호': '🍊',
-  '유윤석': '🍇', '임동명': '🍌', '이상윤': '🥝', '성백은': '🍑',
+  '유윤석': '🍇', '임동명': '🍌', '성백은': '🍑',
   '김진우': '🍈', '문정학': '🥭', '현석': '🍍', '김주표': '🥥',
-  '김경훈': '🍐', '이태영': '🥑', '김정우': '🍋',
+  '김경훈': '🍐', '김정우': '🍋',
 };
+
+// 명단에 없는 신규 인원용 자동 배정 이모지 풀 (과일 먼저, 부족하면 채소·기타)
+// 이름 기반으로 배정하므로 같은 사람은 항상 같은 이모지가 나옴
+const AUTO_EMOJI_POOL: string[] = [
+  // 안 쓴 과일 먼저 (퇴직자 반납분 포함)
+  '🥝', '🥑', '🍎', '🍏', '🍅', '🫒', '🍉', '🍇', '🍓',
+  // 채소
+  '🥕', '🌽', '🥒', '🫑', '🥔', '🧅', '🧄', '🍆', '🥦', '🥬', '🍄',
+  // 동물 (그래도 부족하면)
+  '🐶', '🐱', '🐰', '🐻', '🐼', '🦊', '🐯', '🦁', '🐸', '🐵',
+  '🐷', '🐮', '🐔', '🐧', '🐦', '🦄', '🐢', '🐳', '🐙', '🦋',
+];
+
+// 이름을 숫자로 (같은 이름 → 항상 같은 값)
+function nameToNumber(name: string): number {
+  let sum = 0;
+  for (let i = 0; i < name.length; i++) {
+    sum += name.charCodeAt(i) * (i + 1);
+  }
+  return sum;
+}
+
+// 신규 인원 이모지 자동 배정 (이름 기반, 지정 과일과 안 겹치게)
+function getAutoEmoji(name: string): string {
+  // 이미 쓰이는 지정 이모지들은 제외한 풀 만들기
+  const used = new Set(Object.values(WORKER_EMOJI));
+  used.add('🐶'); used.add('🐾'); // 김대원용도 제외
+  const available = AUTO_EMOJI_POOL.filter((e) => !used.has(e));
+  const pool = available.length > 0 ? available : AUTO_EMOJI_POOL;
+  const idx = nameToNumber(name) % pool.length;
+  return pool[idx];
+}
 
 // 정산 기간 계산: 어떤 날짜가 속한 26일~다음달25일 기간 반환
 function getBillingPeriod(dateStr: string) {
@@ -1502,7 +1534,7 @@ export default function SmartTripAnalyzer() {
         line = medal + ' ' + nameForCopy;
       } else {
         // 일반 4등 이하 → 과일 (명단에 없는 새 사람은 사람 이모지)
-        const fruit = WORKER_EMOJI[worker] || '👤';
+        const fruit = WORKER_EMOJI[worker] || getAutoEmoji(worker);
         line = fruit + ' ' + nameForCopy;
       }
 
