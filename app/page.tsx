@@ -37,7 +37,7 @@ const HOLIDAYS: Record<string, string> = {
 
 // 사람별 고정 과일 이모지 (4등 이하일 때 이름 앞에 표시)
 const WORKER_EMOJI: Record<string, string> = {
-  '이다운': '🍒', '김지혜': '🍓', '임태학': '🫐', '임민호': '🍊',
+  '정주찬': '🍒', '김지혜': '🍓', '임태학': '🫐', '임민호': '🍊',
   '유윤석': '🍇', '임동명': '🍌', '성백은': '🍑',
   '김진우': '🍈', '문정학': '🥭', '현석': '🍍', '김주표': '🥥',
   '김경훈': '🍐', '김정우': '🍋',
@@ -1525,15 +1525,25 @@ export default function SmartTripAnalyzer() {
           const medal = index === 0 ? '👑' : index === 1 ? '🥈' : '🥉';
           line = medal + ' ' + nameForCopy;
         } else {
-          // 4등 이하면 오이수박 + 이름 + 복어굴
+          // 4등 이하면 강아지 + 이름 + 발바닥
           line = '🐶 빛나는대원 🐾';
+        }
+      } else if (worker === '이다운') {
+        // 이다운 특별 규칙 (고양이 + 발자국)
+        if (isMedal) {
+          // 1,2,3등이면 메달만
+          const medal = index === 0 ? '👑' : index === 1 ? '🥈' : '🥉';
+          line = medal + ' ' + nameForCopy;
+        } else {
+          // 4등 이하면 고양이 + 이름 + 발자국
+          line = '🐱 이다운 🐾';
         }
       } else if (isMedal) {
         // 일반 1,2,3등 → 메달만
         const medal = index === 0 ? '👑' : index === 1 ? '🥈' : '🥉';
         line = medal + ' ' + nameForCopy;
       } else {
-        // 일반 4등 이하 → 과일 (명단에 없는 새 사람은 사람 이모지)
+        // 일반 4등 이하 → 과일 (명단에 없는 새 사람은 자동 배정)
         const fruit = WORKER_EMOJI[worker] || getAutoEmoji(worker);
         line = fruit + ' ' + nameForCopy;
       }
